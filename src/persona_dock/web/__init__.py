@@ -12,6 +12,7 @@ from persona_dock.registry import RegistryService
 
 from .app import create_app as _create_base_app
 from .hermes_api import register_hermes_routes
+from .openclaw_api import register_openclaw_routes
 from .v3_api import register_v3_routes
 
 
@@ -40,17 +41,19 @@ def create_app(token: str | None = None):
         return {
             "status": "ok",
             "version": __version__,
-            "phase": 4,
+            "phase": 5,
             "control_plane": "local",
             "registry": RegistryService().summary(),
             "canonical_schema": 3,
             "persona_pack_format": 2,
             "hermes_native_adapter": True,
-            "openclaw_native_adapter": False,
+            "openclaw_native_adapter": True,
+            "workspace_state_separation": True,
         }
 
     register_v3_routes(app, require_token, RegistryService)
     register_hermes_routes(app, require_token, RegistryService)
+    register_openclaw_routes(app, require_token, RegistryService)
     return app
 
 
@@ -86,6 +89,7 @@ def run_server(
     print(f"PersonaDock Web control plane: {url}")
     print(f"Canonical Persona editor: {url}/canonical")
     print(f"Hermes native Profile manager: {url}/hermes")
+    print(f"OpenClaw native Agent manager: {url}/openclaw")
     if token:
         print("API bearer-token authentication is enabled.")
     uvicorn.run(create_app(token=token), host=host, port=port, log_level="info")
