@@ -3,6 +3,7 @@ from __future__ import annotations
 import argparse
 import http.client
 import json
+import os
 import socket
 import subprocess
 import tempfile
@@ -27,8 +28,31 @@ def _http_get(port: int, path: str) -> tuple[int, bytes]:
         connection.close()
 
 
+def _stop_process_tree(process: subprocess.Popen[str]) -> None:
+    if process.poll() is not None:
+        return
+    if os.name == "nt":
+        subprocess.run(
+            ["taskkill", "/PID", str(process.pid), "/T", "/F"],
+            check=False,
+            capture_output=True,
+            text=True,
+        )
+    else:
+        process.terminate()
+    try:
+        process.wait(timeout=10)
+    except subprocess.TimeoutExpired:
+        process.kill()
+        process.wait(timeout=5)
+
+
 def _verify_web(binary: Path, runtime_root: Path) -> None:
     port = _free_port()
+    # A PyInstaller one-file Windows executable may leave its child process holding
+    # the current directory briefly. Use the stable binary directory rather than
+    # the temporary smoke-test directory and terminate the whole process tree.
+    web_cwd = binary.parent
     process = subprocess.Popen(
         [
             str(binary),
@@ -39,7 +63,7 @@ def _verify_web(binary: Path, runtime_root: Path) -> None:
             str(port),
             "--no-browser",
         ],
-        cwd=runtime_root,
+        cwd=web_cwd,
         stdout=subprocess.PIPE,
         stderr=subprocess.STDOUT,
         text=True,
@@ -77,13 +101,7 @@ def _verify_web(binary: Path, runtime_root: Path) -> None:
         failure = error
         raise
     finally:
-        if process.poll() is None:
-            process.terminate()
-            try:
-                process.wait(timeout=10)
-            except subprocess.TimeoutExpired:
-                process.kill()
-                process.wait(timeout=5)
+        _stop_process_tree(process)
         if failure is not None and process.stdout:
             output = process.stdout.read()
             if output:
