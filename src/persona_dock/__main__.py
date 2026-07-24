@@ -1,3 +1,3 @@
-from persona_dock.canonical_cli import main
+from persona_dock.hermes_cli import main
 
 raise SystemExit(main())
