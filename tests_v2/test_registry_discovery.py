@@ -8,7 +8,7 @@ import pytest
 
 from persona_dock.discovery import discover_hermes, discover_openclaw, discover_runtime_instances
 from persona_dock.project import init_project
-from persona_dock.registry.database import RegistryDatabase
+from persona_dock.registry.database import SCHEMA_VERSION, RegistryDatabase
 from persona_dock.registry.service import RegistryService
 from persona_dock.web import create_app
 
@@ -21,11 +21,11 @@ def test_registry_initialization_is_repeatable(tmp_path: Path) -> None:
     database = RegistryDatabase(tmp_path / "personadock.db")
     database.initialize()
     database.initialize()
-    assert database.schema_version() == 1
+    assert database.schema_version() == SCHEMA_VERSION == 2
 
     service = RegistryService(database)
     assert service.summary() == {
-        "schema_version": 1,
+        "schema_version": 2,
         "personas": 0,
         "instances": 0,
         "managed_instances": 0,
