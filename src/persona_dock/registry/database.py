@@ -7,7 +7,7 @@ from pathlib import Path
 from typing import Iterator
 
 
-SCHEMA_VERSION = 2
+SCHEMA_VERSION = 3
 
 
 def registry_root() -> Path:
@@ -179,6 +179,64 @@ CREATE INDEX IF NOT EXISTS idx_propagation_destination
 """
 
 
+_SESSION_SCHEMA = """
+CREATE TABLE IF NOT EXISTS session_summary_policies (
+    id TEXT PRIMARY KEY,
+    persona_id TEXT NOT NULL UNIQUE REFERENCES personas(id) ON DELETE CASCADE,
+    config_json TEXT NOT NULL,
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS session_summaries (
+    id TEXT PRIMARY KEY,
+    persona_id TEXT NOT NULL REFERENCES personas(id) ON DELETE CASCADE,
+    fingerprint TEXT NOT NULL,
+    source_adapter TEXT NOT NULL,
+    source_runtime_instance_id TEXT REFERENCES runtime_instances(id) ON DELETE SET NULL,
+    source_session_id TEXT NOT NULL,
+    source_title TEXT NOT NULL,
+    started_at TEXT,
+    ended_at TEXT,
+    summary TEXT NOT NULL,
+    pending_tasks_json TEXT NOT NULL,
+    emotional_context_json TEXT NOT NULL,
+    sensitivity TEXT NOT NULL,
+    sync_scope TEXT NOT NULL,
+    status TEXT NOT NULL,
+    generated_by TEXT NOT NULL,
+    metadata_json TEXT NOT NULL,
+    reviewed_at TEXT,
+    reviewed_by TEXT,
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL,
+    UNIQUE(persona_id, fingerprint)
+);
+
+CREATE TABLE IF NOT EXISTS session_summary_propagation (
+    id TEXT PRIMARY KEY,
+    persona_id TEXT NOT NULL REFERENCES personas(id) ON DELETE CASCADE,
+    session_summary_id TEXT NOT NULL REFERENCES session_summaries(id) ON DELETE CASCADE,
+    source_runtime_instance_id TEXT REFERENCES runtime_instances(id) ON DELETE SET NULL,
+    destination_runtime_instance_id TEXT NOT NULL REFERENCES runtime_instances(id) ON DELETE CASCADE,
+    content_hash TEXT NOT NULL,
+    status TEXT NOT NULL,
+    details_json TEXT NOT NULL,
+    created_at TEXT NOT NULL,
+    UNIQUE(session_summary_id, destination_runtime_instance_id, content_hash)
+);
+
+CREATE INDEX IF NOT EXISTS idx_session_policy_persona
+    ON session_summary_policies(persona_id);
+CREATE INDEX IF NOT EXISTS idx_session_summary_persona_status
+    ON session_summaries(persona_id, status, sensitivity);
+CREATE INDEX IF NOT EXISTS idx_session_summary_source
+    ON session_summaries(source_runtime_instance_id, source_session_id);
+CREATE INDEX IF NOT EXISTS idx_session_summary_propagation_destination
+    ON session_summary_propagation(destination_runtime_instance_id, created_at);
+"""
+
+
 class RegistryDatabase:
     def __init__(self, path: Path | None = None) -> None:
         self.path = (path or registry_database_path()).expanduser().resolve()
@@ -215,11 +273,9 @@ class RegistryDatabase:
                 raise RuntimeError(
                     f"registry schema {current_version} is newer than supported {SCHEMA_VERSION}"
                 )
-            if current_version < 2:
-                connection.executescript(_SYNC_SCHEMA)
-                current_version = 2
-            else:
-                connection.executescript(_SYNC_SCHEMA)
+            connection.executescript(_SYNC_SCHEMA)
+            connection.executescript(_SESSION_SCHEMA)
+            current_version = SCHEMA_VERSION
             if current is None:
                 connection.execute(
                     "INSERT INTO registry_meta(key, value) VALUES('schema_version', ?)",
