@@ -27,6 +27,8 @@ classifiers = [
 dependencies = [
   "PyYAML>=6.0",
   "jsonschema>=4.20",
+  "fastapi>=0.115,<1",
+  "uvicorn>=0.30,<1",
 ]
 
 [project.urls]
@@ -53,6 +55,7 @@ persona_dock = [
   "data/*.json",
   "data/persona-builder/SKILL.md",
   "data/persona-builder/references/*.md",
+  "web/static/*.html",
 ]
 
 [tool.pytest.ini_options]
