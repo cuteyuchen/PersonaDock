@@ -7,12 +7,13 @@ from typing import Any
 from persona_dock import __version__
 from persona_dock.adapters.hermes import HermesAdapter
 from persona_dock.adapters.legacy_filesystem import LegacyFilesystemAdapter
+from persona_dock.adapters.openclaw import OpenClawAdapter
 
 
 def doctor_report() -> dict[str, Any]:
     adapters = [
         HermesAdapter().doctor(),
-        LegacyFilesystemAdapter("openclaw").doctor(),
+        OpenClawAdapter().doctor(),
         LegacyFilesystemAdapter("generic").doctor(),
     ]
     return {
@@ -50,5 +51,9 @@ def render_doctor(report: dict[str, Any]) -> str:
         if target_path:
             lines.append(f"  target: {target_path}")
         if adapter.get("details", {}).get("native"):
-            lines.append("  deployment: native Hermes Profile Distribution")
+            if adapter["adapter"] == "hermes":
+                lines.append("  deployment: native Hermes Profile Distribution")
+            elif adapter["adapter"] == "openclaw":
+                lines.append("  deployment: native OpenClaw Agent/Workspace overlay")
+                lines.append("  safety: workspace and agent state directory remain separate")
     return "\n".join(lines)
