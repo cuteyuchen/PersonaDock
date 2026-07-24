@@ -10,8 +10,8 @@
 | Phase 2：Adopt、Snapshot 与 Export | 已完成 | #16 | `240aa9871b81acf23e4683f1f9447331c96a78a9` |
 | Phase 3：Canonical Persona v3 | 已完成 | #17 | `52b08790434e7fa8fcac29b6e81362f2ab459908` |
 | Phase 4：Hermes 原生 Adapter | 已完成 | #18 | `18d98b97b17606ad852ae18aaf3f2b322bbdeb84` |
-| Phase 5：OpenClaw 原生 Adapter | 进行中 | #19 | — |
-| Phase 6：受控共享记忆同步 | 未开始 | — | — |
+| Phase 5：OpenClaw 原生 Adapter | 已完成 | #19 | `bcfc442359159308759467b943a7176a779a76df` |
+| Phase 6：受控共享记忆同步 | 进行中 | #20 | — |
 | Phase 7：会话摘要 | 未开始 | — | — |
 | Phase 8：1.0 稳定化 | 未开始 | — | — |
 
