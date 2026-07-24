@@ -7,6 +7,7 @@ import socket
 import subprocess
 import tempfile
 import time
+import traceback
 from pathlib import Path
 
 
@@ -153,5 +154,17 @@ def main() -> int:
     return 0
 
 
+def _persist_failure() -> None:
+    diagnostics = Path("build/personadock/warn-personadock.txt")
+    diagnostics.parent.mkdir(parents=True, exist_ok=True)
+    with diagnostics.open("a", encoding="utf-8") as stream:
+        stream.write("\n\n=== PersonaDock standalone verification failure ===\n")
+        stream.write(traceback.format_exc())
+
+
 if __name__ == "__main__":
-    raise SystemExit(main())
+    try:
+        raise SystemExit(main())
+    except BaseException:
+        _persist_failure()
+        raise
