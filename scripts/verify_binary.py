@@ -23,33 +23,41 @@ def _run(
     timeout: int = 180,
 ) -> str | dict[str, Any] | list[Any]:
     command = [str(binary), *arguments]
-    result = subprocess.run(
-        command,
-        check=False,
-        cwd=cwd,
-        env=environment,
-        capture_output=True,
-        text=True,
-        timeout=timeout,
-    )
+    # On Windows, capture_output=True can return stdout=None for a PyInstaller
+    # console child even when it exits successfully. Explicit files give one
+    # stable redirection contract across all five release platforms.
+    with tempfile.TemporaryFile() as stdout_file, tempfile.TemporaryFile() as stderr_file:
+        result = subprocess.run(
+            command,
+            check=False,
+            cwd=cwd,
+            env=environment,
+            stdout=stdout_file,
+            stderr=stderr_file,
+            timeout=timeout,
+        )
+        stdout_file.seek(0)
+        stderr_file.seek(0)
+        stdout = stdout_file.read().decode("utf-8", errors="replace")
+        stderr = stderr_file.read().decode("utf-8", errors="replace")
     if result.returncode != 0:
         raise RuntimeError(
             "Standalone command failed\n"
             f"command: {command!r}\n"
             f"exit: {result.returncode}\n"
-            f"stdout:\n{result.stdout}\n"
-            f"stderr:\n{result.stderr}"
+            f"stdout:\n{stdout}\n"
+            f"stderr:\n{stderr}"
         )
     if not json_output:
-        return result.stdout
+        return stdout
     try:
-        return json.loads(result.stdout)
+        return json.loads(stdout)
     except json.JSONDecodeError as error:
         raise RuntimeError(
             "Standalone command returned invalid JSON\n"
             f"command: {command!r}\n"
-            f"stdout:\n{result.stdout}\n"
-            f"stderr:\n{result.stderr}"
+            f"stdout:\n{stdout}\n"
+            f"stderr:\n{stderr}"
         ) from error
 
 
