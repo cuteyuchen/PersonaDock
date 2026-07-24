@@ -1,0 +1,150 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "PersonaDock Canonical Persona v3",
+  "type": "object",
+  "required": [
+    "schema_version",
+    "id",
+    "version",
+    "name",
+    "locale",
+    "summary",
+    "identity",
+    "voice",
+    "boundaries",
+    "behaviors",
+    "budgets",
+    "skill",
+    "memory",
+    "targets"
+  ],
+  "properties": {
+    "schema_version": {"const": 3},
+    "id": {"type": "string", "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$"},
+    "version": {"type": "string", "pattern": "^\\d+\\.\\d+\\.\\d+$"},
+    "name": {"type": "string", "minLength": 1},
+    "locale": {"type": "string", "minLength": 2},
+    "summary": {"type": "string", "minLength": 10},
+    "identity": {
+      "type": "object",
+      "required": ["statement", "core_traits"],
+      "properties": {
+        "statement": {"type": "string", "minLength": 10},
+        "core_traits": {
+          "type": "array",
+          "minItems": 3,
+          "uniqueItems": true,
+          "items": {"type": "string", "minLength": 1}
+        }
+      },
+      "additionalProperties": false
+    },
+    "voice": {
+      "type": "object",
+      "required": ["style", "principles"],
+      "properties": {
+        "style": {"type": "string", "minLength": 5},
+        "principles": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {"type": "string", "minLength": 1}
+        }
+      },
+      "additionalProperties": false
+    },
+    "boundaries": {
+      "type": "array",
+      "minItems": 2,
+      "items": {
+        "type": "object",
+        "required": ["id", "rule", "priority", "source_type"],
+        "properties": {
+          "id": {"type": "string", "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$"},
+          "rule": {"type": "string", "minLength": 3},
+          "priority": {"enum": ["low", "medium", "high", "critical"]},
+          "source_type": {
+            "enum": ["explicit-design", "observed-evidence", "reviewed-existing", "safe-default"]
+          },
+          "evidence": {"type": "array", "items": {"type": "string"}}
+        },
+        "additionalProperties": false
+      }
+    },
+    "behaviors": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "required": [
+          "id",
+          "trigger",
+          "behavior",
+          "constraints",
+          "priority",
+          "confidence",
+          "source_type",
+          "evidence",
+          "tests"
+        ],
+        "properties": {
+          "id": {"type": "string", "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$"},
+          "trigger": {
+            "type": "object",
+            "required": ["intent", "conditions"],
+            "properties": {
+              "intent": {"type": "string", "minLength": 1},
+              "conditions": {"type": "array", "items": {"type": "string"}}
+            },
+            "additionalProperties": false
+          },
+          "behavior": {"type": "array", "minItems": 1, "items": {"type": "string"}},
+          "constraints": {"type": "array", "items": {"type": "string"}},
+          "priority": {"enum": ["low", "medium", "high", "critical"]},
+          "confidence": {"enum": ["explicit", "high", "medium", "low"]},
+          "source_type": {
+            "enum": ["explicit-design", "observed-evidence", "reviewed-existing", "safe-default"]
+          },
+          "evidence": {"type": "array", "items": {"type": "string"}},
+          "tests": {"type": "array", "items": {"type": "string"}}
+        },
+        "additionalProperties": false
+      }
+    },
+    "budgets": {
+      "type": "object",
+      "required": ["target_chars", "hard_limit_chars"],
+      "properties": {
+        "target_chars": {"type": "integer", "minimum": 100},
+        "hard_limit_chars": {"type": "integer", "minimum": 200}
+      },
+      "additionalProperties": false
+    },
+    "skill": {
+      "type": "object",
+      "required": ["id", "description"],
+      "properties": {
+        "id": {"type": "string", "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)*$"},
+        "description": {"type": "string", "minLength": 5}
+      }
+    },
+    "memory": {
+      "type": "object",
+      "required": ["enabled", "private_by_default", "bundle_policy", "never_invent"],
+      "properties": {
+        "enabled": {"type": "boolean"},
+        "private_by_default": {"const": true},
+        "bundle_policy": {"enum": ["reviewed", "none"]},
+        "never_invent": {"const": true}
+      }
+    },
+    "targets": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": {"enum": ["hermes", "openclaw", "generic"]}
+    },
+    "migration": {"type": "object"}
+  },
+  "additionalProperties": false
+}
