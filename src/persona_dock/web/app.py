@@ -6,14 +6,17 @@ from pathlib import Path
 from typing import Annotated, Any
 
 from fastapi import Depends, FastAPI, Header, HTTPException, Query
-from fastapi.responses import HTMLResponse
+from fastapi.responses import FileResponse, HTMLResponse
 from pydantic import BaseModel, Field
 
 from persona_dock import __version__
+from persona_dock.adoption import AdoptionError, adopt_runtime_instance, adoption_preview
 from persona_dock.deployment.plans import build_deployment_plan
 from persona_dock.discovery import discover_runtime_instances
 from persona_dock.doctor import doctor_report
+from persona_dock.exports import EXPORT_FORMATS, export_registered_persona
 from persona_dock.registry import RegistryService
+from persona_dock.registry.database import registry_root
 
 
 class DeploymentPlanRequest(BaseModel):
@@ -27,8 +30,33 @@ class DiscoveryRequest(BaseModel):
     target: str | None = Field(default=None, pattern="^(hermes|openclaw)$")
 
 
+class AdoptionRequest(BaseModel):
+    instance_id: str = Field(min_length=1)
+    persona_id: str | None = None
+    name: str | None = None
+    destination: str | None = None
+    link_existing: bool = False
+
+
+class PersonaExportRequest(BaseModel):
+    format: str = Field(pattern="^(personapack|hermes-profile|openclaw-workspace)$")
+    include_memory: bool = False
+
+
 def _index_html() -> str:
     return files("persona_dock.web.static").joinpath("index.html").read_text(encoding="utf-8")
+
+
+def _safe_export_path(value: str) -> Path:
+    path = Path(value).expanduser().resolve()
+    root = (registry_root() / "exports").resolve()
+    try:
+        path.relative_to(root)
+    except ValueError as error:
+        raise HTTPException(status_code=403, detail="export path is outside PersonaDock exports") from error
+    if not path.is_file():
+        raise HTTPException(status_code=404, detail="export file not found")
+    return path
 
 
 def create_app(token: str | None = None) -> FastAPI:
@@ -60,7 +88,7 @@ def create_app(token: str | None = None) -> FastAPI:
         return {
             "status": "ok",
             "version": __version__,
-            "phase": 1,
+            "phase": 2,
             "control_plane": "local",
             "registry": registry().summary(),
         }
@@ -112,6 +140,68 @@ def create_app(token: str | None = None) -> FastAPI:
         _: None = Depends(require_token),
     ) -> dict[str, Any]:
         return discover_runtime_instances(request.target, registry=registry()).to_dict()
+
+    @app.post("/api/adoptions/preview")
+    def preview_adoption(
+        request: AdoptionRequest,
+        _: None = Depends(require_token),
+    ) -> dict[str, Any]:
+        try:
+            return adoption_preview(
+                request.instance_id,
+                persona_id=request.persona_id,
+                name=request.name,
+                destination=request.destination,
+                registry=registry(),
+            )
+        except AdoptionError as error:
+            raise HTTPException(status_code=400, detail=str(error)) from error
+
+    @app.post("/api/adoptions")
+    def adopt(
+        request: AdoptionRequest,
+        _: None = Depends(require_token),
+    ) -> dict[str, Any]:
+        try:
+            return adopt_runtime_instance(
+                request.instance_id,
+                persona_id=request.persona_id,
+                name=request.name,
+                destination=request.destination,
+                link_existing=request.link_existing,
+                registry=registry(),
+            ).to_dict()
+        except (AdoptionError, FileExistsError, FileNotFoundError) as error:
+            raise HTTPException(status_code=400, detail=str(error)) from error
+
+    @app.post("/api/personas/{persona_id}/exports")
+    def export_persona(
+        persona_id: str,
+        request: PersonaExportRequest,
+        _: None = Depends(require_token),
+    ) -> dict[str, Any]:
+        if request.format not in EXPORT_FORMATS:
+            raise HTTPException(status_code=400, detail="unsupported export format")
+        try:
+            result = export_registered_persona(
+                persona_id,
+                request.format,
+                include_memory=request.include_memory,
+                registry=registry(),
+            )
+        except (ValueError, FileNotFoundError) as error:
+            raise HTTPException(status_code=400, detail=str(error)) from error
+        value = result.to_dict()
+        value["download_url"] = f"/api/exports/download?path={result.path}"
+        return value
+
+    @app.get("/api/exports/download")
+    def download_export(
+        path: str,
+        _: None = Depends(require_token),
+    ) -> FileResponse:
+        resolved = _safe_export_path(path)
+        return FileResponse(resolved, filename=resolved.name)
 
     @app.post("/api/plans/deploy")
     def deployment_plan(
