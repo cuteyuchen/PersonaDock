@@ -1,0 +1,55 @@
+name: Pytest diagnostics
+
+on:
+  pull_request:
+
+permissions:
+  contents: read
+  pull-requests: write
+
+jobs:
+  pytest-diagnostics:
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+      - name: Install
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -e .[dev]
+      - name: Run pytest
+        id: pytest
+        continue-on-error: true
+        shell: bash
+        run: |
+          set -o pipefail
+          pytest -vv --tb=short 2>&1 | tee pytest-diagnostics.log
+      - name: Comment failure summary
+        if: steps.pytest.outcome == 'failure'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            const text = fs.readFileSync('pytest-diagnostics.log', 'utf8');
+            const lines = text.split(/\r?\n/);
+            const start = Math.max(0, lines.length - 180);
+            const tail = lines.slice(start).join('\n');
+            const body = [
+              '### Pytest diagnostics',
+              '',
+              '```text',
+              tail.slice(0, 55000),
+              '```'
+            ].join('\n');
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+              body
+            });
+      - name: Fail job when pytest failed
+        if: steps.pytest.outcome == 'failure'
+        run: exit 1
