@@ -56,7 +56,6 @@ persona_dock = [
   "data/*.json",
   "data/persona-builder/SKILL.md",
   "data/persona-builder/references/*.md",
-  "data/persona-builder/references/*.md",
   "web/static/*.html",
 ]
 
