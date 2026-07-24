@@ -47,11 +47,17 @@ def _stop_process_tree(process: subprocess.Popen[str]) -> None:
         process.wait(timeout=5)
 
 
+def _verify_page(port: int, path: str, marker: str) -> None:
+    status, body = _http_get(port, path)
+    if status != 200:
+        raise AssertionError(f"unexpected status for {path}: {status}")
+    page = body.decode("utf-8")
+    if marker not in page:
+        raise AssertionError(f"embedded Web page marker is missing for {path}: {marker}")
+
+
 def _verify_web(binary: Path, runtime_root: Path) -> None:
     port = _free_port()
-    # A PyInstaller one-file Windows executable may leave its child process holding
-    # the current directory briefly. Use the stable binary directory rather than
-    # the temporary smoke-test directory and terminate the whole process tree.
     web_cwd = binary.parent
     process = subprocess.Popen(
         [
@@ -85,15 +91,16 @@ def _verify_web(binary: Path, runtime_root: Path) -> None:
                 health = json.loads(health_body.decode("utf-8"))
                 if health.get("status") != "ok":
                     raise AssertionError(f"unexpected health response: {health}")
+                if health.get("phase", 0) < 4:
+                    raise AssertionError(f"standalone Web health is not Phase 4: {health}")
+                if health.get("hermes_native_adapter") is not True:
+                    raise AssertionError(f"native Hermes flag is missing: {health}")
 
-                page_status, page_body = _http_get(port, "/")
-                if page_status != 200:
-                    raise AssertionError(f"unexpected page status: {page_status}")
-                page = page_body.decode("utf-8")
-                if "PersonaDock Control Plane" not in page:
-                    raise AssertionError("embedded Web page marker is missing")
+                _verify_page(port, "/", "PersonaDock Control Plane")
+                _verify_page(port, "/canonical", "Canonical Persona")
+                _verify_page(port, "/hermes", "Hermes 原生 Profile 管理")
                 return
-            except Exception as error:  # startup polling deliberately accepts transient failures
+            except Exception as error:
                 last_error = error
                 time.sleep(0.5)
         raise RuntimeError(f"Web control plane did not become ready: {last_error}")
@@ -121,7 +128,38 @@ def main() -> int:
         runtime_root = Path(runtime_dir)
         skill_root = runtime_root / "installed-skills"
 
-        subprocess.run([str(binary), "--help"], check=True, cwd=runtime_root)
+        help_result = subprocess.run(
+            [str(binary), "--help"],
+            check=True,
+            cwd=runtime_root,
+            capture_output=True,
+            text=True,
+        )
+        if "hermes" not in help_result.stdout:
+            raise AssertionError("standalone CLI does not expose native Hermes commands")
+
+        hermes_help = subprocess.run(
+            [str(binary), "hermes", "--help"],
+            check=True,
+            cwd=runtime_root,
+            capture_output=True,
+            text=True,
+        )
+        for marker in ("doctor", "profiles", "rollback", "memory"):
+            if marker not in hermes_help.stdout:
+                raise AssertionError(f"standalone Hermes CLI marker is missing: {marker}")
+
+        deploy_help = subprocess.run(
+            [str(binary), "deploy", "--help"],
+            check=True,
+            cwd=runtime_root,
+            capture_output=True,
+            text=True,
+        )
+        for marker in ("--profile", "--activate", "--legacy-filesystem"):
+            if marker not in deploy_help.stdout:
+                raise AssertionError(f"standalone deploy marker is missing: {marker}")
+
         doctor = subprocess.run(
             [str(binary), "doctor", "--json"],
             check=True,
@@ -132,6 +170,12 @@ def main() -> int:
         doctor_data = json.loads(doctor.stdout)
         if "adapters" not in doctor_data:
             raise AssertionError("standalone doctor output does not contain adapters")
+        hermes = next(
+            (item for item in doctor_data["adapters"] if item.get("adapter") == "hermes"),
+            None,
+        )
+        if hermes is None or hermes.get("capabilities", {}).get("native_deployment") is not True:
+            raise AssertionError("standalone doctor does not expose native Hermes capability")
 
         subprocess.run(
             [
