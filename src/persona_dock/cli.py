@@ -4,14 +4,18 @@ import argparse
 import json
 import sys
 from pathlib import Path
+from typing import Any
 
 from .compiler import compile_project
 from .deployment.plans import apply_deployment_plan, build_deployment_plan
+from .discovery import discover_runtime_instances
 from .distill import distill_chat
 from .doctor import doctor_report, render_doctor
 from .installer import rollback, status, uninstall
+from .io import load_yaml
 from .packaging import export_public, inspect_package, pack_project
-from .project import find_project, init_project, validate_project
+from .project import PROJECT_FILE, find_project, init_project, validate_project
+from .registry import RegistryService
 from .skill_install import TARGETS as SKILL_TARGETS
 from .skill_install import install_skill
 
@@ -109,6 +113,78 @@ def _run_deployment(args: argparse.Namespace) -> int:
     return 0
 
 
+def _register_project(project_path: Path) -> dict[str, Any]:
+    root = find_project(project_path)
+    project = load_yaml(root / PROJECT_FILE)
+    record = RegistryService().register_persona(
+        persona_id=str(project["id"]),
+        name=str(project["name"]),
+        version=str(project["version"]),
+        source_path=root,
+        schema_version=int(project.get("schema_version", 2)),
+        summary=str(project.get("summary", "")),
+    )
+    return record.to_dict()
+
+
+def _print_personas(json_output: bool) -> int:
+    values = [record.to_dict() for record in RegistryService().list_personas()]
+    if json_output:
+        print(json.dumps(values, ensure_ascii=False, indent=2))
+        return 0
+    if not values:
+        print("No personas registered. Create one with `personadock init`.")
+        return 0
+    for value in values:
+        print(f"{value['id']:<24} {value['version']:<10} {value['name']}")
+        if value.get("source_path"):
+            print(f"  {value['source_path']}")
+    return 0
+
+
+def _show_persona(persona_id: str, json_output: bool) -> int:
+    service = RegistryService()
+    record = service.get_persona(persona_id)
+    if record is None:
+        raise ValueError(f"persona is not registered: {persona_id}")
+    value = {
+        **record.to_dict(),
+        "bindings": [binding.to_dict() for binding in service.list_bindings(persona_id)],
+    }
+    if json_output:
+        print(json.dumps(value, ensure_ascii=False, indent=2))
+    else:
+        print(f"{value['name']} ({value['id']})")
+        print(f"Version: {value['version']}")
+        print(f"Schema: {value['schema_version']}")
+        print(f"Source: {value.get('source_path') or 'not bound'}")
+        print(f"Bindings: {len(value['bindings'])}")
+        if value.get("summary"):
+            print(f"Summary: {value['summary']}")
+    return 0
+
+
+def _print_instances(adapter: str | None, managed: bool | None, json_output: bool) -> int:
+    values = [
+        record.to_dict()
+        for record in RegistryService().list_runtime_instances(adapter=adapter, managed=managed)
+    ]
+    if json_output:
+        print(json.dumps(values, ensure_ascii=False, indent=2))
+        return 0
+    if not values:
+        print("No runtime instances found. Run `personadock discover`.")
+        return 0
+    for value in values:
+        state = "managed" if value["managed"] else "unmanaged"
+        print(
+            f"{value['adapter']:<10} {value['platform_instance_id']:<20} "
+            f"{state:<10} {value['display_name']}"
+        )
+        print(f"  {value['transport']}://{value['location']}")
+    return 0
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="personadock",
@@ -116,7 +192,7 @@ def build_parser() -> argparse.ArgumentParser:
     )
     sub = parser.add_subparsers(dest="command", required=True)
 
-    command = sub.add_parser("init", help="create a local persona project")
+    command = sub.add_parser("init", help="create and register a local persona project")
     command.add_argument("destination")
     command.add_argument("--id", required=True)
     command.add_argument("--name", required=True)
@@ -163,6 +239,28 @@ def build_parser() -> argparse.ArgumentParser:
     command = sub.add_parser("doctor", help="inspect platform commands and safe deployment targets")
     command.add_argument("--json", action="store_true")
 
+    command = sub.add_parser("discover", help="read-only discovery of Hermes Profiles and OpenClaw Agents")
+    command.add_argument("--target", choices=["hermes", "openclaw"])
+    command.add_argument("--json", action="store_true")
+
+    persona = sub.add_parser("persona", help="query the local Persona Registry")
+    persona_sub = persona.add_subparsers(dest="persona_command", required=True)
+    command = persona_sub.add_parser("list", help="list registered personas")
+    command.add_argument("--json", action="store_true")
+    command = persona_sub.add_parser("show", help="show one registered persona")
+    command.add_argument("persona_id")
+    command.add_argument("--json", action="store_true")
+    command = persona_sub.add_parser("register", help="register an existing PersonaDock project")
+    command.add_argument("project", nargs="?", default=".")
+    command.add_argument("--json", action="store_true")
+
+    command = sub.add_parser("instances", help="list discovered runtime instances")
+    command.add_argument("--adapter", choices=["hermes", "openclaw"])
+    managed = command.add_mutually_exclusive_group()
+    managed.add_argument("--managed", action="store_true")
+    managed.add_argument("--unmanaged", action="store_true")
+    command.add_argument("--json", action="store_true")
+
     command = sub.add_parser("deploy", help="plan and deploy a PersonaPack safely")
     _add_deployment_arguments(command)
 
@@ -195,7 +293,7 @@ def build_parser() -> argparse.ArgumentParser:
     command.add_argument("--container", help="running Docker container used for the installation")
     command.add_argument("--no-restore", action="store_true")
 
-    sub.add_parser("status", help="show managed installations")
+    sub.add_parser("status", help="show managed legacy installations")
 
     command = sub.add_parser("export-public", help="export a memory-free public project build")
     command.add_argument("project", nargs="?", default=".")
@@ -209,10 +307,12 @@ def main(argv: list[str] | None = None) -> int:
 
     if args.command == "init":
         result = init_project(Path(args.destination), args.id, args.name, args.locale, args.force)
+        _register_project(result)
         print(result)
         return 0
     if args.command == "distill":
         result = distill_chat(Path(args.input), Path(args.destination), args.id, args.name, args.speaker, args.locale)
+        _register_project(result)
         print(result)
         return 0
     if args.command == "skill" and args.skill_command == "install":
@@ -234,10 +334,12 @@ def main(argv: list[str] | None = None) -> int:
         return 0
     if args.command == "build":
         result = compile_project(Path(args.project), Path(args.output) if args.output else None, args.target)
+        _register_project(Path(args.project))
         print(result)
         return 0
     if args.command == "pack":
         result = pack_project(Path(args.project), Path(args.output) if args.output else None, args.target)
+        _register_project(Path(args.project))
         print(result)
         return 0
     if args.command == "inspect":
@@ -247,6 +349,35 @@ def main(argv: list[str] | None = None) -> int:
         report = doctor_report()
         print(json.dumps(report, ensure_ascii=False, indent=2) if args.json else render_doctor(report))
         return 0
+    if args.command == "discover":
+        report = discover_runtime_instances(args.target)
+        if args.json:
+            print(json.dumps(report.to_dict(), ensure_ascii=False, indent=2))
+        else:
+            print(f"Scanned: {', '.join(report.scanned_adapters)}")
+            print(f"Discovered: {len(report.instances)}")
+            for instance in report.instances:
+                state = "managed" if instance.managed else "unmanaged"
+                print(
+                    f"- {instance.adapter}/{instance.platform_instance_id} "
+                    f"[{state}] {instance.display_name}"
+                )
+                print(f"  {instance.location}")
+            for warning in report.warnings:
+                print(f"Warning: {warning}", file=sys.stderr)
+        return 0
+    if args.command == "persona":
+        if args.persona_command == "list":
+            return _print_personas(args.json)
+        if args.persona_command == "show":
+            return _show_persona(args.persona_id, args.json)
+        if args.persona_command == "register":
+            value = _register_project(Path(args.project))
+            print(json.dumps(value, ensure_ascii=False, indent=2) if args.json else value["id"])
+            return 0
+    if args.command == "instances":
+        managed_filter = True if args.managed else False if args.unmanaged else None
+        return _print_instances(args.adapter, managed_filter, args.json)
     if args.command in {"deploy", "install"}:
         if args.command == "install":
             print("Warning: `personadock install` is deprecated; use `personadock deploy`.", file=sys.stderr)

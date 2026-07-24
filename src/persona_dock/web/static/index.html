@@ -7,29 +7,41 @@
   <style>
     :root { color-scheme: light dark; font-family: Inter, ui-sans-serif, system-ui, sans-serif; }
     body { margin: 0; background: #0b1020; color: #eef2ff; }
-    main { max-width: 1080px; margin: 0 auto; padding: 32px 20px 56px; }
-    header { display: flex; justify-content: space-between; gap: 24px; align-items: flex-start; margin-bottom: 28px; }
+    main { max-width: 1180px; margin: 0 auto; padding: 28px 20px 56px; }
+    header, .toolbar, .section-head { display: flex; justify-content: space-between; gap: 16px; align-items: flex-start; }
+    header { margin-bottom: 22px; }
     h1 { margin: 0 0 8px; font-size: 30px; }
-    h2 { margin-top: 0; font-size: 18px; }
-    p { color: #aeb8d4; line-height: 1.6; }
+    h2 { margin: 0; font-size: 19px; }
+    h3 { margin: 0 0 8px; font-size: 16px; }
+    p { color: #aeb8d4; line-height: 1.55; }
     .badge { border: 1px solid #33446d; border-radius: 999px; padding: 7px 11px; color: #b9c8f5; white-space: nowrap; }
-    .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 16px; }
-    .card { background: #121a30; border: 1px solid #273452; border-radius: 16px; padding: 18px; }
-    .metric { font-size: 24px; font-weight: 700; margin-top: 8px; }
+    .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 14px; }
+    .metrics { grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); }
+    .card { background: #121a30; border: 1px solid #273452; border-radius: 15px; padding: 16px; }
+    .metric { font-size: 25px; font-weight: 700; margin-top: 6px; }
     .muted { color: #93a0bf; }
-    .status-ready { color: #6ee7b7; }
-    .status-needs-path { color: #fbbf24; }
+    .status-ready, .managed { color: #6ee7b7; }
+    .status-needs-path, .unmanaged { color: #fbbf24; }
     .status-unavailable { color: #fca5a5; }
-    button, input { font: inherit; }
+    button, input, select { font: inherit; }
     button { background: #6478ff; color: white; border: 0; border-radius: 10px; padding: 10px 14px; cursor: pointer; }
-    button:hover { background: #7888ff; }
-    input { width: 100%; box-sizing: border-box; border: 1px solid #33446d; border-radius: 10px; padding: 10px; background: #0d1427; color: inherit; }
-    .toolbar { display: flex; gap: 10px; align-items: end; margin-bottom: 18px; }
+    button.secondary { background: #273452; }
+    button:hover { filter: brightness(1.1); }
+    button:disabled { opacity: .55; cursor: wait; }
+    input, select { box-sizing: border-box; border: 1px solid #33446d; border-radius: 10px; padding: 10px; background: #0d1427; color: inherit; }
+    .toolbar { align-items: end; margin-bottom: 18px; }
     .toolbar label { flex: 1; color: #aeb8d4; font-size: 14px; }
-    code { color: #c7d2fe; }
+    .actions { display: flex; gap: 9px; flex-wrap: wrap; }
+    .section { margin-top: 24px; }
+    .section-head { align-items: center; margin-bottom: 12px; }
+    code { color: #c7d2fe; overflow-wrap: anywhere; }
     pre { white-space: pre-wrap; overflow-wrap: anywhere; background: #0b1123; border-radius: 12px; padding: 14px; color: #cbd5e1; }
-    ul { padding-left: 18px; color: #aeb8d4; }
-    @media (max-width: 640px) { header, .toolbar { flex-direction: column; } .toolbar { align-items: stretch; } }
+    .empty { color: #93a0bf; border: 1px dashed #33446d; border-radius: 14px; padding: 20px; }
+    .facts { display: grid; gap: 7px; margin-top: 12px; }
+    .facts div { color: #aeb8d4; }
+    .chips { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 10px; }
+    .chip { border: 1px solid #33446d; border-radius: 999px; padding: 4px 8px; font-size: 12px; color: #b9c8f5; }
+    @media (max-width: 680px) { header, .toolbar, .section-head { flex-direction: column; } .toolbar { align-items: stretch; } }
   </style>
 </head>
 <body>
@@ -37,84 +49,145 @@
   <header>
     <div>
       <h1>PersonaDock Control Plane</h1>
-      <p>Phase 0：安全部署基础、环境诊断和本地 Web 控制台。此版本不会静默猜测不可信的 Hermes/OpenClaw 目录。</p>
+      <p>Phase 1：Persona Registry 与只读运行实例发现。扫描不会修改 Hermes Profile 或 OpenClaw Workspace。</p>
     </div>
     <div class="badge" id="health-badge">正在连接…</div>
   </header>
 
   <section class="toolbar card">
-    <label>远程访问令牌（本机默认无需填写）
+    <label>远程访问令牌（本机无需填写）
       <input id="token" type="password" autocomplete="off" placeholder="Bearer token">
     </label>
-    <button id="refresh" type="button">刷新诊断</button>
+    <div class="actions">
+      <button id="refresh" class="secondary" type="button">刷新数据</button>
+      <button id="discover" type="button">扫描 Hermes 与 OpenClaw</button>
+    </div>
   </section>
 
-  <section class="grid" id="metrics">
-    <article class="card"><div class="muted">PersonaDock</div><div class="metric" id="version">—</div></article>
-    <article class="card"><div class="muted">系统</div><div class="metric" id="system">—</div></article>
-    <article class="card"><div class="muted">部署模式</div><div class="metric">Plan first</div></article>
+  <section class="grid metrics">
+    <article class="card"><div class="muted">Persona</div><div class="metric" id="persona-count">—</div></article>
+    <article class="card"><div class="muted">运行实例</div><div class="metric" id="instance-count">—</div></article>
+    <article class="card"><div class="muted">已管理实例</div><div class="metric" id="managed-count">—</div></article>
+    <article class="card"><div class="muted">Registry Schema</div><div class="metric" id="schema-version">—</div></article>
   </section>
 
-  <section style="margin-top: 22px;">
-    <h2>Adapter 诊断</h2>
+  <section class="section">
+    <div class="section-head">
+      <h2>人格注册表</h2>
+      <span class="muted">当前由 init/pack 注册；Adopt 将在 Phase 2 加入</span>
+    </div>
+    <div class="grid" id="personas"></div>
+  </section>
+
+  <section class="section">
+    <div class="section-head">
+      <h2>发现的运行实例</h2>
+      <span class="muted" id="discovery-status">尚未执行本轮扫描</span>
+    </div>
+    <div class="grid" id="instances"></div>
+  </section>
+
+  <section class="section">
+    <h2 style="margin-bottom: 12px;">Adapter 诊断</h2>
     <div class="grid" id="adapters"></div>
   </section>
 
-  <section class="card" style="margin-top: 22px;">
-    <h2>当前阶段的安全规则</h2>
-    <ul>
-      <li>显式 <code>--path</code> 优先。</li>
-      <li>未提供路径时，仅接受带有可信标志文件的唯一目录。</li>
-      <li>Docker 兼容模式必须显式指定容器内绝对路径。</li>
-      <li>执行部署前使用 <code>personadock deploy --dry-run</code> 查看文件级计划。</li>
-      <li>Hermes Profile 和 OpenClaw Agent 原生管理将在后续阶段实现。</li>
-    </ul>
-  </section>
-
-  <section class="card" style="margin-top: 22px;">
-    <h2>原始诊断数据</h2>
+  <section class="card section">
+    <h2>原始状态</h2>
     <pre id="raw">尚未加载</pre>
   </section>
 </main>
 <script>
   const tokenInput = document.getElementById('token');
   const healthBadge = document.getElementById('health-badge');
-  const adapters = document.getElementById('adapters');
   const raw = document.getElementById('raw');
+  const discoverButton = document.getElementById('discover');
 
-  function headers() {
+  function authHeaders(extra = {}) {
     const token = tokenInput.value.trim();
-    return token ? { Authorization: `Bearer ${token}` } : {};
+    return token ? { ...extra, Authorization: `Bearer ${token}` } : extra;
   }
 
-  async function request(path) {
-    const response = await fetch(path, { headers: headers() });
-    if (!response.ok) throw new Error(`${response.status} ${response.statusText}`);
+  async function request(path, options = {}) {
+    const response = await fetch(path, { ...options, headers: authHeaders(options.headers || {}) });
+    if (!response.ok) {
+      let detail = `${response.status} ${response.statusText}`;
+      try { detail = (await response.json()).detail || detail; } catch (_) {}
+      throw new Error(detail);
+    }
     return response.json();
   }
 
+  function escapeHtml(value) {
+    return String(value ?? '')
+      .replaceAll('&', '&amp;').replaceAll('<', '&lt;')
+      .replaceAll('>', '&gt;').replaceAll('"', '&quot;');
+  }
+
   function adapterCard(adapter) {
-    const statusClass = `status-${adapter.status}`;
     const details = adapter.details || {};
     return `<article class="card">
-      <div class="muted">${adapter.adapter}</div>
-      <div class="metric ${statusClass}">${adapter.status}</div>
-      <p>${adapter.message}</p>
-      ${details.target_path ? `<p><strong>目标：</strong><code>${details.target_path}</code></p>` : ''}
-      ${adapter.executable ? `<p><strong>命令：</strong><code>${adapter.executable}</code></p>` : ''}
+      <div class="muted">${escapeHtml(adapter.adapter)}</div>
+      <div class="metric status-${escapeHtml(adapter.status)}">${escapeHtml(adapter.status)}</div>
+      <p>${escapeHtml(adapter.message)}</p>
+      ${details.target_path ? `<div><code>${escapeHtml(details.target_path)}</code></div>` : ''}
+      ${adapter.executable ? `<div class="muted">CLI: <code>${escapeHtml(adapter.executable)}</code></div>` : ''}
     </article>`;
+  }
+
+  function personaCard(persona) {
+    return `<article class="card">
+      <h3>${escapeHtml(persona.name)}</h3>
+      <div class="muted"><code>${escapeHtml(persona.id)}</code> · v${escapeHtml(persona.version)}</div>
+      <p>${escapeHtml(persona.summary || '尚无摘要')}</p>
+      <div class="facts">
+        <div>Schema：${escapeHtml(persona.schema_version)}</div>
+        <div>源工程：<code>${escapeHtml(persona.source_path || '未绑定')}</code></div>
+      </div>
+    </article>`;
+  }
+
+  function instanceCard(instance) {
+    const metadata = instance.metadata || {};
+    const files = metadata.files || metadata.markers || [];
+    return `<article class="card">
+      <div class="section-head">
+        <h3>${escapeHtml(instance.display_name)}</h3>
+        <span class="${instance.managed ? 'managed' : 'unmanaged'}">${instance.managed ? '已管理' : '未管理'}</span>
+      </div>
+      <div class="muted">${escapeHtml(instance.adapter)} / <code>${escapeHtml(instance.platform_instance_id)}</code></div>
+      <div class="facts">
+        <div>传输：${escapeHtml(instance.transport)}</div>
+        <div>位置：<code>${escapeHtml(instance.location)}</code></div>
+        <div>来源：${escapeHtml(metadata.discovery_source || 'registry')}</div>
+        <div>Skills：${escapeHtml(metadata.skill_count ?? 0)}</div>
+      </div>
+      <div class="chips">${files.map(name => `<span class="chip">${escapeHtml(name)}</span>`).join('')}</div>
+    </article>`;
+  }
+
+  function renderList(elementId, values, renderer, emptyText) {
+    const element = document.getElementById(elementId);
+    element.innerHTML = values.length ? values.map(renderer).join('') : `<div class="empty">${escapeHtml(emptyText)}</div>`;
   }
 
   async function refresh() {
     healthBadge.textContent = '正在连接…';
     try {
-      const [health, doctor] = await Promise.all([request('/api/health'), request('/api/doctor')]);
+      const [health, doctor, personas, instances] = await Promise.all([
+        request('/api/health'), request('/api/doctor'), request('/api/personas'), request('/api/instances')
+      ]);
       healthBadge.textContent = `运行正常 · Phase ${health.phase}`;
       healthBadge.className = 'badge status-ready';
-      document.getElementById('version').textContent = doctor.personadock_version;
-      document.getElementById('system').textContent = `${doctor.system} ${doctor.machine}`;
-      adapters.innerHTML = doctor.adapters.map(adapterCard).join('');
-      raw.textContent = JSON.stringify(doctor, null, 2);
+      const registry = health.registry || {};
+      document.getElementById('persona-count').textContent = registry.personas ?? 0;
+      document.getElementById('instance-count').textContent = registry.instances ?? 0;
+      document.getElementById('managed-count').textContent = registry.managed_instances ?? 0;
+      document.getElementById('schema-version').textContent = registry.schema_version ?? '—';
+      renderList('personas', personas, personaCard, '尚未注册 Persona。使用 personadock init 创建工程。');
+      renderList('instances', instances, instanceCard, '尚未发现运行实例。点击“扫描 Hermes 与 OpenClaw”。');
+      document.getElementById('adapters').innerHTML = doctor.adapters.map(adapterCard).join('');
+      raw.textContent = JSON.stringify({ health, doctor, personas, instances }, null, 2);
     } catch (error) {
       healthBadge.textContent = '连接失败';
       healthBadge.className = 'badge status-unavailable';
@@ -122,7 +195,27 @@
     }
   }
 
+  async function discover() {
+    discoverButton.disabled = true;
+    document.getElementById('discovery-status').textContent = '正在只读扫描…';
+    try {
+      const report = await request('/api/discover', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ target: null })
+      });
+      document.getElementById('discovery-status').textContent = `本轮发现 ${report.instances.length} 个实例`;
+      raw.textContent = JSON.stringify(report, null, 2);
+      await refresh();
+    } catch (error) {
+      document.getElementById('discovery-status').textContent = `扫描失败：${error}`;
+    } finally {
+      discoverButton.disabled = false;
+    }
+  }
+
   document.getElementById('refresh').addEventListener('click', refresh);
+  discoverButton.addEventListener('click', discover);
   tokenInput.addEventListener('keydown', event => { if (event.key === 'Enter') refresh(); });
   refresh();
 </script>
