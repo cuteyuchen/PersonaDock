@@ -11,7 +11,7 @@ from persona_dock.exports import EXPORT_FORMATS, export_registered_persona
 from persona_dock.registry import RegistryService
 
 
-def add_adoption_parsers(sub: argparse._SubParsersAction[argparse.ArgumentParser]) -> None:
+def add_adoption_parsers(sub: argparse._SubParsersAction) -> None:
     command = sub.add_parser("adopt", help="snapshot and adopt existing Hermes/OpenClaw personas")
     selection = command.add_mutually_exclusive_group(required=True)
     selection.add_argument("--instance", action="append", help="runtime instance ID; repeat for batch adoption")
@@ -52,7 +52,7 @@ def _print_adoption_preview(values: list[dict[str, Any]]) -> None:
         print(f"{instance['adapter']}/{instance['platform_instance_id']} → {value['persona_id']}")
         print(f"  source: {instance['location']}")
         print(f"  destination: {value['destination']}")
-        print(f"  snapshot: yes")
+        print("  snapshot: yes")
         print(f"  selected skill: {value.get('selected_skill') or 'none'}")
         print(f"  imported skills: {len(value.get('skills', []))}")
         print(f"  memory candidates: {len(value.get('memory_documents', []))}")
