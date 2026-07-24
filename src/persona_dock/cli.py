@@ -6,6 +6,7 @@ import sys
 from pathlib import Path
 from typing import Any
 
+from .adoption_commands import add_adoption_parsers, run_adoption_command
 from .compiler import compile_project
 from .deployment.plans import apply_deployment_plan, build_deployment_plan
 from .discovery import discover_runtime_instances
@@ -182,6 +183,7 @@ def _print_instances(adapter: str | None, managed: bool | None, json_output: boo
             f"{state:<10} {value['display_name']}"
         )
         print(f"  {value['transport']}://{value['location']}")
+        print(f"  registry-id: {value['id']}")
     return 0
 
 
@@ -261,6 +263,8 @@ def build_parser() -> argparse.ArgumentParser:
     managed.add_argument("--unmanaged", action="store_true")
     command.add_argument("--json", action="store_true")
 
+    add_adoption_parsers(sub)
+
     command = sub.add_parser("deploy", help="plan and deploy a PersonaPack safely")
     _add_deployment_arguments(command)
 
@@ -304,6 +308,10 @@ def build_parser() -> argparse.ArgumentParser:
 
 def main(argv: list[str] | None = None) -> int:
     args = build_parser().parse_args(argv)
+
+    phase_two_result = run_adoption_command(args)
+    if phase_two_result is not None:
+        return phase_two_result
 
     if args.command == "init":
         result = init_project(Path(args.destination), args.id, args.name, args.locale, args.force)
@@ -363,6 +371,7 @@ def main(argv: list[str] | None = None) -> int:
                     f"[{state}] {instance.display_name}"
                 )
                 print(f"  {instance.location}")
+                print(f"  registry-id: {instance.id}")
             for warning in report.warnings:
                 print(f"Warning: {warning}", file=sys.stderr)
         return 0
