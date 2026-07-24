@@ -10,6 +10,47 @@ import tempfile
 import time
 import traceback
 from pathlib import Path
+from typing import Any
+
+
+def _run(
+    binary: Path,
+    cwd: Path,
+    environment: dict[str, str],
+    arguments: list[str],
+    *,
+    json_output: bool = False,
+    timeout: int = 180,
+) -> str | dict[str, Any] | list[Any]:
+    command = [str(binary), *arguments]
+    result = subprocess.run(
+        command,
+        check=False,
+        cwd=cwd,
+        env=environment,
+        capture_output=True,
+        text=True,
+        timeout=timeout,
+    )
+    if result.returncode != 0:
+        raise RuntimeError(
+            "Standalone command failed\n"
+            f"command: {command!r}\n"
+            f"exit: {result.returncode}\n"
+            f"stdout:\n{result.stdout}\n"
+            f"stderr:\n{result.stderr}"
+        )
+    if not json_output:
+        return result.stdout
+    try:
+        return json.loads(result.stdout)
+    except json.JSONDecodeError as error:
+        raise RuntimeError(
+            "Standalone command returned invalid JSON\n"
+            f"command: {command!r}\n"
+            f"stdout:\n{result.stdout}\n"
+            f"stderr:\n{result.stderr}"
+        ) from error
 
 
 def _free_port() -> int:
@@ -51,9 +92,8 @@ def _verify_page(port: int, path: str, marker: str) -> None:
     status, body = _http_get(port, path)
     if status != 200:
         raise AssertionError(f"unexpected status for {path}: {status}")
-    page = body.decode("utf-8")
-    if marker not in page:
-        raise AssertionError(f"embedded Web page marker is missing for {path}: {marker}")
+    if marker not in body.decode("utf-8"):
+        raise AssertionError(f"embedded Web marker missing for {path}: {marker}")
 
 
 def _verify_web(binary: Path, environment: dict[str, str]) -> None:
@@ -74,56 +114,56 @@ def _verify_web(binary: Path, environment: dict[str, str]) -> None:
         stderr=subprocess.STDOUT,
         text=True,
     )
-    failure: Exception | None = None
+    failure: BaseException | None = None
     try:
         deadline = time.monotonic() + 30
-        last_error: Exception | None = None
+        last_error: BaseException | None = None
         while time.monotonic() < deadline:
             if process.poll() is not None:
                 output = process.stdout.read() if process.stdout else ""
                 raise RuntimeError(
-                    f"Web control plane exited before becoming ready ({process.returncode}):\n{output}"
+                    f"Web process exited before ready ({process.returncode}):\n{output}"
                 )
             try:
-                health_status, health_body = _http_get(port, "/api/health")
-                if health_status != 200:
-                    raise AssertionError(f"unexpected health status: {health_status}")
-                health = json.loads(health_body.decode("utf-8"))
-                if health.get("status") != "ok":
-                    raise AssertionError(f"unexpected health response: {health}")
+                status, body = _http_get(port, "/api/health")
+                if status != 200:
+                    raise AssertionError(f"unexpected health status: {status}")
+                health = json.loads(body.decode("utf-8"))
                 if health.get("phase", 0) < 8:
-                    raise AssertionError(f"standalone Web health is not Phase 8: {health}")
-                for marker in (
+                    raise AssertionError(health)
+                required_true = (
                     "hermes_native_adapter",
                     "openclaw_native_adapter",
                     "workspace_state_separation",
                     "governed_memory_sync",
                     "reviewed_session_summaries",
                     "stable_1_0_contract",
-                ):
-                    if health.get(marker) is not True:
-                        raise AssertionError(f"health flag is missing: {marker}: {health}")
+                )
+                if any(health.get(field) is not True for field in required_true):
+                    raise AssertionError(health)
                 if health.get("raw_session_sync") is not False:
-                    raise AssertionError(f"raw session sync safety flag is invalid: {health}")
+                    raise AssertionError(health)
                 if health.get("adapter_api_version") != "1.0":
-                    raise AssertionError(f"Adapter API health flag is invalid: {health}")
+                    raise AssertionError(health)
                 if health.get("persona_pack_signatures") != "detached-ed25519-v1":
-                    raise AssertionError(f"signature health flag is invalid: {health}")
+                    raise AssertionError(health)
                 if health.get("encrypted_private_backup") != "aes-256-gcm-scrypt-v1":
-                    raise AssertionError(f"backup health flag is invalid: {health}")
-
-                _verify_page(port, "/", "PersonaDock Control Plane")
-                _verify_page(port, "/canonical", "Canonical Persona")
-                _verify_page(port, "/hermes", "Hermes 原生 Profile 管理")
-                _verify_page(port, "/openclaw", "OpenClaw 原生 Agent 管理")
-                _verify_page(port, "/sync", "同步策略与审核中心")
-                _verify_page(port, "/sessions", "Session Summary 审核中心")
+                    raise AssertionError(health)
+                for path, marker in (
+                    ("/", "PersonaDock Control Plane"),
+                    ("/canonical", "Canonical Persona"),
+                    ("/hermes", "Hermes 原生 Profile 管理"),
+                    ("/openclaw", "OpenClaw 原生 Agent 管理"),
+                    ("/sync", "同步策略与审核中心"),
+                    ("/sessions", "Session Summary 审核中心"),
+                ):
+                    _verify_page(port, path, marker)
                 return
-            except Exception as error:
+            except BaseException as error:
                 last_error = error
                 time.sleep(0.5)
         raise RuntimeError(f"Web control plane did not become ready: {last_error}")
-    except Exception as error:
+    except BaseException as error:
         failure = error
         raise
     finally:
@@ -134,24 +174,18 @@ def _verify_web(binary: Path, environment: dict[str, str]) -> None:
                 print("Web control plane output:\n" + output)
 
 
-def _run(
+def _check_help(
     binary: Path,
     runtime_root: Path,
     environment: dict[str, str],
-    arguments: list[str],
-    *,
-    json_output: bool = False,
-) -> str | dict:
-    result = subprocess.run(
-        [str(binary), *arguments],
-        check=True,
-        cwd=runtime_root,
-        env=environment,
-        capture_output=True,
-        text=True,
-        timeout=180,
-    )
-    return json.loads(result.stdout) if json_output else result.stdout
+    command: str,
+    markers: tuple[str, ...],
+) -> None:
+    arguments = ["--help"] if not command else [command, "--help"]
+    output = str(_run(binary, runtime_root, environment, arguments))
+    for marker in markers:
+        if marker not in output:
+            raise AssertionError(f"{command or 'main'} help is missing: {marker}")
 
 
 def _verify_1_0_workflow(
@@ -167,18 +201,8 @@ def _verify_1_0_workflow(
     restored = runtime_root / "restored"
     card = runtime_root / "golden-card.json"
 
-    _run(
-        binary,
-        runtime_root,
-        environment,
-        ["init", str(project), "--id", "golden", "--name", "Golden"],
-    )
-    _run(
-        binary,
-        runtime_root,
-        environment,
-        ["pack", str(project), "--output", str(package)],
-    )
+    _run(binary, runtime_root, environment, ["init", str(project), "--id", "golden", "--name", "Golden"])
+    _run(binary, runtime_root, environment, ["pack", str(project), "--output", str(package)])
     package_info = _run(
         binary,
         runtime_root,
@@ -205,32 +229,14 @@ def _verify_1_0_workflow(
         binary,
         runtime_root,
         environment,
-        [
-            "trust",
-            "sign",
-            str(package),
-            "--key",
-            str(private_key),
-            "--output",
-            str(signature),
-            "--json",
-        ],
+        ["trust", "sign", str(package), "--key", str(private_key), "--output", str(signature), "--json"],
         json_output=True,
     )
     verified = _run(
         binary,
         runtime_root,
         environment,
-        [
-            "trust",
-            "verify",
-            str(package),
-            "--signature",
-            str(signature),
-            "--trusted-key",
-            str(public_key),
-            "--json",
-        ],
+        ["trust", "verify", str(package), "--signature", str(signature), "--trusted-key", str(public_key), "--json"],
         json_output=True,
     )
     assert isinstance(verified, dict)
@@ -241,14 +247,7 @@ def _verify_1_0_workflow(
         binary,
         runtime_root,
         environment,
-        [
-            "backup",
-            "create",
-            str(project),
-            "--output",
-            str(backup),
-            "--json",
-        ],
+        ["backup", "create", str(project), "--output", str(backup), "--json"],
         json_output=True,
     )
     assert isinstance(backup_info, dict)
@@ -268,16 +267,7 @@ def _verify_1_0_workflow(
         binary,
         runtime_root,
         environment,
-        [
-            "character-card",
-            "export",
-            str(project),
-            "--output",
-            str(card),
-            "--card-version",
-            "3",
-            "--json",
-        ],
+        ["character-card", "export", str(project), "--output", str(card), "--card-version", "3", "--json"],
         json_output=True,
     )
     card_info = _run(
@@ -295,90 +285,65 @@ def _verify_1_0_workflow(
 def main() -> int:
     parser = argparse.ArgumentParser(description="Smoke-test a PersonaDock standalone executable.")
     parser.add_argument("--binary", required=True, type=Path)
-    args = parser.parse_args()
-
-    binary = args.binary.resolve()
+    arguments = parser.parse_args()
+    binary = arguments.binary.resolve()
     if not binary.is_file():
         raise FileNotFoundError(binary)
 
-    with tempfile.TemporaryDirectory(prefix="personadock-runtime-") as runtime_dir:
-        runtime_root = Path(runtime_dir)
-        skill_root = runtime_root / "installed-skills"
+    with tempfile.TemporaryDirectory(prefix="personadock-runtime-") as directory:
+        runtime_root = Path(directory)
         environment = dict(os.environ)
         environment["PERSONADOCK_HOME"] = str(runtime_root / "state")
         environment["PERSONADOCK_BACKUP_PASSWORD"] = "standalone-test-password"
+        version = str(_run(binary, runtime_root, environment, ["--version"]))
+        if "1.0.0" not in version:
+            raise AssertionError(version)
 
-        version = _run(binary, runtime_root, environment, ["--version"])
-        if "1.0.0" not in str(version):
-            raise AssertionError(f"standalone version is not 1.0.0: {version}")
+        _check_help(
+            binary,
+            runtime_root,
+            environment,
+            "",
+            ("hermes", "openclaw", "sync", "session", "adapter", "trust", "backup", "character-card"),
+        )
+        help_contracts = {
+            "hermes": ("doctor", "profiles", "rollback", "memory"),
+            "openclaw": ("doctor", "agents", "rollback", "memory"),
+            "sync": ("policy", "collect", "candidates", "review", "plan", "apply"),
+            "session": ("policy", "collect", "list", "review", "preview"),
+            "adapter": ("list", "show", "doctor"),
+            "trust": ("keygen", "sign", "verify"),
+            "backup": ("create", "inspect", "restore"),
+            "character-card": ("inspect", "import", "export"),
+        }
+        for command, markers in help_contracts.items():
+            _check_help(binary, runtime_root, environment, command, markers)
 
-        main_help = str(_run(binary, runtime_root, environment, ["--help"]))
-        for marker in (
-            "hermes",
-            "openclaw",
-            "sync",
-            "session",
-            "adapter",
-            "trust",
-            "backup",
-            "character-card",
-        ):
-            if marker not in main_help:
-                raise AssertionError(f"standalone CLI does not expose command: {marker}")
-
-        for command, markers in (
-            ("hermes", ("doctor", "profiles", "rollback", "memory")),
-            ("openclaw", ("doctor", "agents", "rollback", "memory")),
-            ("sync", ("policy", "collect", "candidates", "review", "plan", "apply")),
-            ("session", ("policy", "collect", "list", "review", "preview")),
-            ("adapter", ("list", "show", "doctor")),
-            ("trust", ("keygen", "sign", "verify")),
-            ("backup", ("create", "inspect", "restore")),
-            ("character-card", ("inspect", "import", "export")),
-        ):
-            help_text = str(_run(binary, runtime_root, environment, [command, "--help"]))
-            for marker in markers:
-                if marker not in help_text:
-                    raise AssertionError(
-                        f"standalone {command} CLI marker is missing: {marker}"
-                    )
-
-        adapter_summary = _run(
+        adapters = _run(
             binary,
             runtime_root,
             environment,
             ["adapter", "list", "--no-plugins", "--json"],
             json_output=True,
         )
-        assert isinstance(adapter_summary, dict)
-        if adapter_summary.get("adapter_api_version") != "1.0":
-            raise AssertionError(adapter_summary)
+        assert isinstance(adapters, dict)
+        if adapters.get("adapter_api_version") != "1.0":
+            raise AssertionError(adapters)
 
-        subprocess.run(
-            [
-                str(binary),
-                "skill",
-                "install",
-                "--target",
-                "generic",
-                "--scope",
-                "project",
-                "--path",
-                str(skill_root),
-            ],
-            check=True,
-            cwd=runtime_root,
-            env=environment,
-            timeout=120,
+        skill_root = runtime_root / "installed-skills"
+        _run(
+            binary,
+            runtime_root,
+            environment,
+            ["skill", "install", "--target", "generic", "--scope", "project", "--path", str(skill_root)],
         )
-        required = [
+        for relative in (
             "persona-builder/SKILL.md",
             "persona-builder/references/output-contract.md",
             "persona-builder/references/prompt-contract.md",
             "persona-builder/references/evidence-contract.md",
             "persona-builder/references/memory-contract.md",
-        ]
-        for relative in required:
+        ):
             if not (skill_root / relative).is_file():
                 raise FileNotFoundError(skill_root / relative)
 
