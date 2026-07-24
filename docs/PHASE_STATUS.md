@@ -12,12 +12,13 @@
 | Phase 4：Hermes 原生 Adapter | 已完成 | #18 | `18d98b97b17606ad852ae18aaf3f2b322bbdeb84` |
 | Phase 5：OpenClaw 原生 Adapter | 已完成 | #19 | `bcfc442359159308759467b943a7176a779a76df` |
 | Phase 6：受控共享记忆同步 | 已完成 | #20 | `bb68484257182a6e9c0dd659b66d3a303cb9ba2c` |
-| Phase 7：会话摘要 | 进行中 | #21 | — |
-| Phase 8：1.0 稳定化 | 未开始 | — | — |
+| Phase 7：会话摘要 | 已完成 | #21 | `4eadd0381bd28242bd49f1bffade87b97eb31f53` |
+| Phase 8：1.0 稳定化 | 进行中 | 待创建 | — |
 
 ## 阶段规则
 
-- 只有常规 CI、独立程序验证和五平台 Release dry-run 全部成功后，阶段才能标记为完成。
+- 只有常规 CI、独立程序验证、Python 兼容矩阵、真实 Docker Adapter 验收和五平台 Release dry-run 全部成功后，阶段才能标记为完成。
 - 阶段范围发生变化时，先更新 `docs/REFACTOR_PLAN.md` 或本状态文件，再修改实现。
 - 平台 Adapter 之前不得恢复不可信路径的静默写入。
 - Memory 和 Session 同步之前必须完成来源、审核和冲突模型。
+- 1.0 发布前必须锁定 Schema、PersonaPack 和 Adapter API 兼容承诺。
