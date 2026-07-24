@@ -5,7 +5,7 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "persona-dock"
 version = "0.1.0"
-description = "Local-first toolkit for creating, packaging, and installing portable AI personas."
+description = "Local-first toolkit for creating, packaging, and managing portable AI personas."
 readme = "README.md"
 requires-python = ">=3.10"
 license = { text = "MIT" }
@@ -40,8 +40,8 @@ Issues = "https://github.com/cuteyuchen/PersonaDock/issues"
 dev = ["pytest>=8.0"]
 
 [project.scripts]
-personadock = "persona_dock.cli:main"
-pdock = "persona_dock.cli:main"
+personadock = "persona_dock.canonical_cli:main"
+pdock = "persona_dock.canonical_cli:main"
 
 [tool.setuptools]
 package-dir = {"" = "src"}
