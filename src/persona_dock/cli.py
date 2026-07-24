@@ -20,11 +20,20 @@ def _print_status() -> int:
         print("No PersonaDock installations found.")
         return 0
     for record in records:
+        destination = record["destination"]
+        if record.get("transport") == "docker":
+            destination = f"docker://{record.get('container')}{destination}"
         print(
             f"{record['id']}@{record['version']}  {record['target']:<9}  "
-            f"{record['destination']}"
+            f"{destination}"
         )
     return 0
+
+
+def _destination(path: str | None, container: str | None) -> str | Path | None:
+    if not path:
+        return None
+    return path if container else Path(path)
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -81,15 +90,30 @@ def build_parser() -> argparse.ArgumentParser:
     command = sub.add_parser("install", help="install a PersonaPack into an agent")
     command.add_argument("package")
     command.add_argument("--target", required=True, choices=["hermes", "openclaw", "generic"])
-    command.add_argument("--path")
+    command.add_argument(
+        "--path",
+        help="custom host destination, or an absolute path inside --container",
+    )
+    command.add_argument(
+        "--container",
+        help="running Docker container name; install through docker exec and docker cp",
+    )
 
     command = sub.add_parser("rollback", help="restore files replaced by PersonaDock")
     command.add_argument("--target", required=True, choices=["hermes", "openclaw", "generic"])
-    command.add_argument("--path")
+    command.add_argument(
+        "--path",
+        help="custom host destination, or the same absolute path used inside --container",
+    )
+    command.add_argument("--container", help="running Docker container used for the installation")
 
     command = sub.add_parser("uninstall", help="remove an installed persona")
     command.add_argument("--target", required=True, choices=["hermes", "openclaw", "generic"])
-    command.add_argument("--path")
+    command.add_argument(
+        "--path",
+        help="custom host destination, or the same absolute path used inside --container",
+    )
+    command.add_argument("--container", help="running Docker container used for the installation")
     command.add_argument("--no-restore", action="store_true")
 
     sub.add_parser("status", help="show managed installations")
@@ -141,14 +165,26 @@ def main(argv: list[str] | None = None) -> int:
         print(json.dumps(inspect_package(Path(args.package)), ensure_ascii=False, indent=2))
         return 0
     if args.command == "install":
-        result = install_package(Path(args.package), args.target, Path(args.path) if args.path else None)
+        result = install_package(
+            Path(args.package),
+            args.target,
+            _destination(args.path, args.container),
+            args.container,
+        )
         print(result)
         return 0
     if args.command == "rollback":
-        print(rollback(args.target, Path(args.path) if args.path else None))
+        print(rollback(args.target, _destination(args.path, args.container), args.container))
         return 0
     if args.command == "uninstall":
-        print(uninstall(args.target, Path(args.path) if args.path else None, restore_previous=not args.no_restore))
+        print(
+            uninstall(
+                args.target,
+                _destination(args.path, args.container),
+                restore_previous=not args.no_restore,
+                container=args.container,
+            )
+        )
         return 0
     if args.command == "status":
         return _print_status()
