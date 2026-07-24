@@ -1,0 +1,272 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>PersonaDock · OpenClaw Agents</title>
+  <style>
+    :root { color-scheme: dark; font-family: Inter, ui-sans-serif, system-ui, sans-serif; }
+    * { box-sizing: border-box; }
+    body { margin: 0; background: #090f1f; color: #eef2ff; }
+    main { max-width: 1200px; margin: 0 auto; padding: 28px 20px 60px; }
+    header, .row, .section-head { display: flex; gap: 14px; align-items: center; justify-content: space-between; }
+    h1, h2, h3 { margin: 0; }
+    h1 { font-size: 30px; }
+    h2 { font-size: 19px; }
+    p, label, .muted { color: #aeb8d4; line-height: 1.5; }
+    a { color: #a5b4fc; }
+    .card { background: #121a30; border: 1px solid #293756; border-radius: 15px; padding: 16px; }
+    .section { margin-top: 22px; }
+    .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 14px; }
+    .form-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 12px; }
+    label { display: grid; gap: 7px; font-size: 14px; }
+    input { width: 100%; border: 1px solid #33446d; border-radius: 10px; padding: 10px; background: #0d1427; color: inherit; }
+    input[type="checkbox"] { width: auto; }
+    .check { display: flex; align-items: center; gap: 8px; }
+    button { background: #6478ff; color: white; border: 0; border-radius: 10px; padding: 10px 14px; cursor: pointer; }
+    button.secondary { background: #273452; }
+    button.danger { background: #b94b69; }
+    button:disabled { opacity: .55; cursor: wait; }
+    .actions { display: flex; gap: 9px; flex-wrap: wrap; margin-top: 14px; }
+    .badge { border: 1px solid #33446d; border-radius: 999px; padding: 7px 11px; white-space: nowrap; }
+    .ready { color: #6ee7b7; }
+    .warn { color: #fbbf24; }
+    .error { color: #fca5a5; }
+    code { color: #c7d2fe; overflow-wrap: anywhere; }
+    pre { white-space: pre-wrap; overflow-wrap: anywhere; background: #080d1b; padding: 14px; border-radius: 12px; min-height: 130px; }
+    .notice { border-left: 3px solid #fbbf24; padding-left: 12px; }
+    @media (max-width: 680px) { header, .row, .section-head { align-items: stretch; flex-direction: column; } }
+  </style>
+</head>
+<body>
+<main>
+  <header>
+    <div>
+      <h1>OpenClaw 原生 Agent 管理</h1>
+      <p>通过 OpenClaw CLI 创建或发现 Agent，并把 PersonaDock Overlay 部署到 Workspace。Agent State Directory、认证、Sessions 与索引从不作为 Workspace 写入目标。</p>
+    </div>
+    <div class="badge" id="status">正在连接…</div>
+  </header>
+
+  <section class="card section">
+    <div class="form-grid">
+      <label>远程 API 令牌
+        <input id="token" type="password" autocomplete="off" placeholder="本机访问无需填写">
+      </label>
+      <label>Docker 容器
+        <input id="container" placeholder="留空为非 Docker">
+      </label>
+      <label>SSH Host
+        <input id="ssh-host" placeholder="user@host；与 Docker 二选一">
+      </label>
+    </div>
+    <div class="actions">
+      <button id="refresh" class="secondary">刷新 Doctor 与 Agents</button>
+      <a href="/">总览</a>
+      <a href="/canonical">Canonical</a>
+      <a href="/hermes">Hermes</a>
+    </div>
+  </section>
+
+  <section class="section grid">
+    <article class="card">
+      <h2>OpenClaw Doctor</h2>
+      <div id="doctor" class="muted" style="margin-top:12px">尚未加载</div>
+    </article>
+    <article class="card">
+      <h2>所有权边界</h2>
+      <p class="notice">PersonaDock 只拥有 SOUL、IDENTITY、一个 Persona Skill 和 <code>personadock-manifest.json</code>。</p>
+      <p>现有 Workspace 中没有所有权 Manifest 时，检测到同名文件会拒绝部署；只有显式“接管现有文件”才允许覆盖。</p>
+    </article>
+  </section>
+
+  <section class="section">
+    <div class="section-head"><h2>Agents</h2><span id="agent-count" class="muted">—</span></div>
+    <div class="grid" id="agents"></div>
+  </section>
+
+  <section class="card section">
+    <h2>部署 PersonaPack</h2>
+    <div class="form-grid" style="margin-top:14px">
+      <label>PersonaPack 绝对路径
+        <input id="package" placeholder="/path/to/persona.personapack">
+      </label>
+      <label>Agent ID
+        <input id="agent" placeholder="留空则使用 Persona ID">
+      </label>
+      <label>新 Agent Workspace
+        <input id="workspace" placeholder="新建 Agent 必须填写绝对路径">
+      </label>
+      <label>新 Agent Model
+        <input id="model" placeholder="可选，如 openai/gpt-5.6-sol">
+      </label>
+      <label>Bindings（逗号分隔）
+        <input id="bindings" placeholder="telegram:ops,discord:guild-a">
+      </label>
+    </div>
+    <div class="actions">
+      <label class="check"><input id="take-ownership" type="checkbox"> 接管现有 SOUL / IDENTITY / Persona Skill</label>
+    </div>
+    <div class="actions">
+      <button id="preview" class="secondary">生成部署计划</button>
+      <button id="deploy">确认并部署</button>
+    </div>
+  </section>
+
+  <section class="card section">
+    <h2>回滚</h2>
+    <div class="form-grid" style="margin-top:14px">
+      <label>Agent ID
+        <input id="rollback-agent" placeholder="xiaoyou">
+      </label>
+      <label>Workspace 快照目录
+        <input id="snapshot" placeholder="~/.personadock/snapshots/openclaw/...">
+      </label>
+      <label>Workspace 校验路径
+        <input id="rollback-workspace" placeholder="可选；必须与 OpenClaw 报告一致">
+      </label>
+    </div>
+    <div class="actions">
+      <label class="check"><input id="delete-agent" type="checkbox"> 删除 Agent（OpenClaw 会移动相关目录到 Trash）</label>
+      <button id="rollback" class="danger">执行回滚</button>
+    </div>
+  </section>
+
+  <section class="card section">
+    <h2>OpenClaw Memory</h2>
+    <p>Pull 读取 <code>MEMORY.md</code> 和 <code>memory/*.md</code>，只生成未审核候选；Push 只写 PersonaDock 管理区块，并执行 <code>memory index --force</code>。</p>
+    <div class="form-grid">
+      <label>Persona ID
+        <input id="memory-persona" placeholder="xiaoyou">
+      </label>
+      <label>Agent ID
+        <input id="memory-agent" placeholder="xiaoyou">
+      </label>
+    </div>
+    <div class="actions">
+      <button id="memory-pull" class="secondary">拉取候选记忆</button>
+      <button id="memory-push">推送已审核记忆并重建索引</button>
+    </div>
+  </section>
+
+  <section class="card section"><h2>操作结果</h2><pre id="output">尚未执行操作</pre></section>
+</main>
+<script>
+  const $ = id => document.getElementById(id);
+  const output = $('output');
+  function headers(extra = {}) {
+    const token = $('token').value.trim();
+    return token ? { ...extra, Authorization: `Bearer ${token}` } : extra;
+  }
+  async function request(path, options = {}) {
+    const response = await fetch(path, { ...options, headers: headers(options.headers || {}) });
+    if (!response.ok) {
+      let detail = `${response.status} ${response.statusText}`;
+      try { detail = (await response.json()).detail || detail; } catch (_) {}
+      throw new Error(detail);
+    }
+    return response.json();
+  }
+  function escapeHtml(value) {
+    return String(value ?? '').replaceAll('&', '&amp;').replaceAll('<', '&lt;')
+      .replaceAll('>', '&gt;').replaceAll('"', '&quot;');
+  }
+  function transport() {
+    return {
+      container: $('container').value.trim() || null,
+      ssh_host: $('ssh-host').value.trim() || null
+    };
+  }
+  function query() {
+    const params = new URLSearchParams();
+    const value = transport();
+    if (value.container) params.set('container', value.container);
+    if (value.ssh_host) params.set('ssh_host', value.ssh_host);
+    const text = params.toString();
+    return text ? `?${text}` : '';
+  }
+  function deploymentPayload() {
+    const bindings = $('bindings').value.split(',').map(v => v.trim()).filter(Boolean);
+    return {
+      package: $('package').value.trim(),
+      agent: $('agent').value.trim() || null,
+      workspace: $('workspace').value.trim() || null,
+      model: $('model').value.trim() || null,
+      bindings,
+      take_ownership: $('take-ownership').checked,
+      ...transport()
+    };
+  }
+  async function refresh() {
+    $('status').textContent = '正在连接…';
+    try {
+      const [doctor, agents] = await Promise.all([
+        request(`/api/openclaw/doctor${query()}`),
+        request(`/api/openclaw/agents${query()}`)
+      ]);
+      $('status').textContent = doctor.available ? 'OpenClaw Ready' : doctor.status;
+      $('status').className = `badge ${doctor.available ? 'ready' : 'error'}`;
+      $('doctor').innerHTML = `<p><strong>${escapeHtml(doctor.status)}</strong></p>
+        <p>${escapeHtml(doctor.message)}</p>
+        <div>CLI：<code>${escapeHtml(doctor.executable || '不可用')}</code></div>
+        <div>版本：<code>${escapeHtml(doctor.version || '未知')}</code></div>
+        <div>传输：<code>${escapeHtml(doctor.details?.transport || 'local')}</code></div>`;
+      $('agent-count').textContent = `${agents.length} 个 Agent`;
+      $('agents').innerHTML = agents.length ? agents.map(item => `<article class="card">
+        <h3>${escapeHtml(item.name)}</h3>
+        <div>Agent：<code>${escapeHtml(item.id)}</code></div>
+        <div>Workspace：<code>${escapeHtml(item.workspace)}</code></div>
+        <div>State：<code>${escapeHtml(item.agent_dir || '未报告')}</code></div>
+        <div>Bindings：${escapeHtml(item.bindings?.length || 0)}</div>
+      </article>`).join('') : '<div class="card muted">未发现 Agent。</div>';
+      output.textContent = JSON.stringify({ doctor, agents }, null, 2);
+    } catch (error) {
+      $('status').textContent = '连接失败';
+      $('status').className = 'badge error';
+      output.textContent = String(error);
+    }
+  }
+  async function post(path, body) {
+    output.textContent = '正在执行…';
+    try {
+      const value = await request(path, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body)
+      });
+      output.textContent = JSON.stringify(value, null, 2);
+      await refresh();
+      return value;
+    } catch (error) {
+      output.textContent = String(error);
+      throw error;
+    }
+  }
+  $('refresh').addEventListener('click', refresh);
+  $('preview').addEventListener('click', () => post('/api/openclaw/plans', deploymentPayload()));
+  $('deploy').addEventListener('click', async () => {
+    if (!confirm('确认创建或更新 OpenClaw Agent Workspace？现有 PersonaDock 管理文件会先创建快照。')) return;
+    await post('/api/openclaw/deployments', deploymentPayload());
+  });
+  $('rollback').addEventListener('click', async () => {
+    if (!confirm('确认执行 OpenClaw 回滚？删除 Agent 时 OpenClaw 会处理 Workspace、State 和 Sessions 的 Trash 迁移。')) return;
+    await post('/api/openclaw/rollback', {
+      agent: $('rollback-agent').value.trim(),
+      snapshot: $('snapshot').value.trim() || null,
+      workspace: $('rollback-workspace').value.trim() || null,
+      delete_agent: $('delete-agent').checked,
+      ...transport()
+    });
+  });
+  $('memory-pull').addEventListener('click', () => post('/api/openclaw/memory/pull', {
+    persona_id: $('memory-persona').value.trim(), agent: $('memory-agent').value.trim(), ...transport()
+  }));
+  $('memory-push').addEventListener('click', async () => {
+    if (!confirm('确认推送已审核共享记忆并强制重建该 Agent 的 Memory Index？')) return;
+    await post('/api/openclaw/memory/push', {
+      persona_id: $('memory-persona').value.trim(), agent: $('memory-agent').value.trim(), ...transport()
+    });
+  });
+  $('token').addEventListener('keydown', event => { if (event.key === 'Enter') refresh(); });
+  refresh();
+</script>
+</body>
+</html>
