@@ -1,12 +1,12 @@
 from __future__ import annotations
 
 import argparse
+import http.client
 import json
 import socket
 import subprocess
 import tempfile
 import time
-import urllib.request
 from pathlib import Path
 
 
@@ -14,6 +14,16 @@ def _free_port() -> int:
     with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as listener:
         listener.bind(("127.0.0.1", 0))
         return int(listener.getsockname()[1])
+
+
+def _http_get(port: int, path: str) -> tuple[int, bytes]:
+    connection = http.client.HTTPConnection("127.0.0.1", port, timeout=1)
+    try:
+        connection.request("GET", path)
+        response = connection.getresponse()
+        return response.status, response.read()
+    finally:
+        connection.close()
 
 
 def _verify_web(binary: Path, runtime_root: Path) -> None:
@@ -33,7 +43,7 @@ def _verify_web(binary: Path, runtime_root: Path) -> None:
         stderr=subprocess.STDOUT,
         text=True,
     )
-    output = ""
+    failure: Exception | None = None
     try:
         deadline = time.monotonic() + 30
         last_error: Exception | None = None
@@ -44,18 +54,17 @@ def _verify_web(binary: Path, runtime_root: Path) -> None:
                     f"Web control plane exited before becoming ready ({process.returncode}):\n{output}"
                 )
             try:
-                with urllib.request.urlopen(
-                    f"http://127.0.0.1:{port}/api/health",
-                    timeout=1,
-                ) as response:
-                    health = json.loads(response.read().decode("utf-8"))
+                health_status, health_body = _http_get(port, "/api/health")
+                if health_status != 200:
+                    raise AssertionError(f"unexpected health status: {health_status}")
+                health = json.loads(health_body.decode("utf-8"))
                 if health.get("status") != "ok":
                     raise AssertionError(f"unexpected health response: {health}")
-                with urllib.request.urlopen(
-                    f"http://127.0.0.1:{port}/",
-                    timeout=1,
-                ) as response:
-                    page = response.read().decode("utf-8")
+
+                page_status, page_body = _http_get(port, "/")
+                if page_status != 200:
+                    raise AssertionError(f"unexpected page status: {page_status}")
+                page = page_body.decode("utf-8")
                 if "PersonaDock Control Plane" not in page:
                     raise AssertionError("embedded Web page marker is missing")
                 return
@@ -63,6 +72,9 @@ def _verify_web(binary: Path, runtime_root: Path) -> None:
                 last_error = error
                 time.sleep(0.5)
         raise RuntimeError(f"Web control plane did not become ready: {last_error}")
+    except Exception as error:
+        failure = error
+        raise
     finally:
         if process.poll() is None:
             process.terminate()
@@ -71,6 +83,10 @@ def _verify_web(binary: Path, runtime_root: Path) -> None:
             except subprocess.TimeoutExpired:
                 process.kill()
                 process.wait(timeout=5)
+        if failure is not None and process.stdout:
+            output = process.stdout.read()
+            if output:
+                print("Web control plane output:\n" + output)
 
 
 def main() -> int:
