@@ -44,9 +44,6 @@ dev = ["pytest>=8.0"]
 personadock = "persona_dock.stable_cli:main"
 pdock = "persona_dock.stable_cli:main"
 
-[project.entry-points."personadock.adapters"]
-# External packages may register PersonaAdapter factories in this group.
-
 [tool.setuptools]
 package-dir = {"" = "src"}
 
