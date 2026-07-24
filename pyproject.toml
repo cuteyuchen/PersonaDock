@@ -29,7 +29,10 @@ dependencies = [
   "jsonschema>=4.20",
   "fastapi>=0.115,<1",
   "uvicorn>=0.30,<1",
-  "cryptography>=46,<50",
+  # cryptography 49 stopped publishing macOS x86_64 wheels. PersonaDock
+  # supports Intel macOS standalone builds, so remain on the latest 46–48
+  # statically linked wheel line throughout the 1.0 release series.
+  "cryptography>=46,<49",
 ]
 
 [project.urls]
