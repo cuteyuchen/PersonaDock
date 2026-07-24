@@ -1,3 +1,3 @@
-from persona_dock.openclaw_cli import main
+from persona_dock.sync_cli import main
 
 raise SystemExit(main())
