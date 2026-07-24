@@ -3,10 +3,11 @@
 from __future__ import annotations
 
 import os
-from typing import Annotated
+from typing import Annotated, Any
 
-from fastapi import Header, HTTPException
+from fastapi import Depends, Header, HTTPException
 
+from persona_dock import __version__
 from persona_dock.registry import RegistryService
 
 from .app import create_app as _create_base_app
@@ -23,6 +24,26 @@ def create_app(token: str | None = None):
             return
         if authorization != f"Bearer {token}":
             raise HTTPException(status_code=401, detail="invalid or missing bearer token")
+
+    # Replace the previous phase health route while retaining the same security
+    # dependency and stable public URL.
+    app.router.routes = [
+        route
+        for route in app.router.routes
+        if not (getattr(route, "path", None) == "/api/health" and "GET" in getattr(route, "methods", set()))
+    ]
+
+    @app.get("/api/health")
+    def health(_: None = Depends(require_token)) -> dict[str, Any]:
+        return {
+            "status": "ok",
+            "version": __version__,
+            "phase": 3,
+            "control_plane": "local",
+            "registry": RegistryService().summary(),
+            "canonical_schema": 3,
+            "persona_pack_format": 2,
+        }
 
     register_v3_routes(app, require_token, RegistryService)
     return app
