@@ -56,9 +56,8 @@ def _verify_page(port: int, path: str, marker: str) -> None:
         raise AssertionError(f"embedded Web page marker is missing for {path}: {marker}")
 
 
-def _verify_web(binary: Path, runtime_root: Path) -> None:
+def _verify_web(binary: Path) -> None:
     port = _free_port()
-    web_cwd = binary.parent
     process = subprocess.Popen(
         [
             str(binary),
@@ -69,7 +68,7 @@ def _verify_web(binary: Path, runtime_root: Path) -> None:
             str(port),
             "--no-browser",
         ],
-        cwd=web_cwd,
+        cwd=binary.parent,
         stdout=subprocess.PIPE,
         stderr=subprocess.STDOUT,
         text=True,
@@ -91,14 +90,19 @@ def _verify_web(binary: Path, runtime_root: Path) -> None:
                 health = json.loads(health_body.decode("utf-8"))
                 if health.get("status") != "ok":
                     raise AssertionError(f"unexpected health response: {health}")
-                if health.get("phase", 0) < 4:
-                    raise AssertionError(f"standalone Web health is not Phase 4: {health}")
+                if health.get("phase", 0) < 5:
+                    raise AssertionError(f"standalone Web health is not Phase 5: {health}")
                 if health.get("hermes_native_adapter") is not True:
                     raise AssertionError(f"native Hermes flag is missing: {health}")
+                if health.get("openclaw_native_adapter") is not True:
+                    raise AssertionError(f"native OpenClaw flag is missing: {health}")
+                if health.get("workspace_state_separation") is not True:
+                    raise AssertionError(f"workspace/state separation flag is missing: {health}")
 
                 _verify_page(port, "/", "PersonaDock Control Plane")
                 _verify_page(port, "/canonical", "Canonical Persona")
                 _verify_page(port, "/hermes", "Hermes 原生 Profile 管理")
+                _verify_page(port, "/openclaw", "OpenClaw 原生 Agent 管理")
                 return
             except Exception as error:
                 last_error = error
@@ -115,6 +119,17 @@ def _verify_web(binary: Path, runtime_root: Path) -> None:
                 print("Web control plane output:\n" + output)
 
 
+def _run_help(binary: Path, runtime_root: Path, arguments: list[str]) -> str:
+    result = subprocess.run(
+        [str(binary), *arguments],
+        check=True,
+        cwd=runtime_root,
+        capture_output=True,
+        text=True,
+    )
+    return result.stdout
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description="Smoke-test a PersonaDock standalone executable.")
     parser.add_argument("--binary", required=True, type=Path)
@@ -128,36 +143,32 @@ def main() -> int:
         runtime_root = Path(runtime_dir)
         skill_root = runtime_root / "installed-skills"
 
-        help_result = subprocess.run(
-            [str(binary), "--help"],
-            check=True,
-            cwd=runtime_root,
-            capture_output=True,
-            text=True,
-        )
-        if "hermes" not in help_result.stdout:
-            raise AssertionError("standalone CLI does not expose native Hermes commands")
+        main_help = _run_help(binary, runtime_root, ["--help"])
+        for marker in ("hermes", "openclaw"):
+            if marker not in main_help:
+                raise AssertionError(f"standalone CLI does not expose native {marker} commands")
 
-        hermes_help = subprocess.run(
-            [str(binary), "hermes", "--help"],
-            check=True,
-            cwd=runtime_root,
-            capture_output=True,
-            text=True,
-        )
+        hermes_help = _run_help(binary, runtime_root, ["hermes", "--help"])
         for marker in ("doctor", "profiles", "rollback", "memory"):
-            if marker not in hermes_help.stdout:
+            if marker not in hermes_help:
                 raise AssertionError(f"standalone Hermes CLI marker is missing: {marker}")
 
-        deploy_help = subprocess.run(
-            [str(binary), "deploy", "--help"],
-            check=True,
-            cwd=runtime_root,
-            capture_output=True,
-            text=True,
-        )
-        for marker in ("--profile", "--activate", "--legacy-filesystem"):
-            if marker not in deploy_help.stdout:
+        openclaw_help = _run_help(binary, runtime_root, ["openclaw", "--help"])
+        for marker in ("doctor", "agents", "rollback", "memory"):
+            if marker not in openclaw_help:
+                raise AssertionError(f"standalone OpenClaw CLI marker is missing: {marker}")
+
+        deploy_help = _run_help(binary, runtime_root, ["deploy", "--help"])
+        for marker in (
+            "--profile",
+            "--activate",
+            "--agent",
+            "--workspace",
+            "--take-ownership",
+            "--ssh-host",
+            "--legacy-filesystem",
+        ):
+            if marker not in deploy_help:
                 raise AssertionError(f"standalone deploy marker is missing: {marker}")
 
         doctor = subprocess.run(
@@ -170,12 +181,29 @@ def main() -> int:
         doctor_data = json.loads(doctor.stdout)
         if "adapters" not in doctor_data:
             raise AssertionError("standalone doctor output does not contain adapters")
-        hermes = next(
-            (item for item in doctor_data["adapters"] if item.get("adapter") == "hermes"),
-            None,
+        for adapter_name in ("hermes", "openclaw"):
+            adapter = next(
+                (
+                    item
+                    for item in doctor_data["adapters"]
+                    if item.get("adapter") == adapter_name
+                ),
+                None,
+            )
+            if (
+                adapter is None
+                or adapter.get("capabilities", {}).get("native_deployment") is not True
+            ):
+                raise AssertionError(
+                    f"standalone doctor does not expose native {adapter_name} capability"
+                )
+        openclaw = next(
+            item
+            for item in doctor_data["adapters"]
+            if item.get("adapter") == "openclaw"
         )
-        if hermes is None or hermes.get("capabilities", {}).get("native_deployment") is not True:
-            raise AssertionError("standalone doctor does not expose native Hermes capability")
+        if openclaw.get("details", {}).get("workspace_state_separation") is not True:
+            raise AssertionError("OpenClaw doctor does not expose workspace/state separation")
 
         subprocess.run(
             [
@@ -210,7 +238,7 @@ def main() -> int:
             if marker not in skill_text:
                 raise AssertionError(f"missing Skill marker: {marker}")
 
-        _verify_web(binary, runtime_root)
+        _verify_web(binary)
 
     print(f"Verified standalone binary: {binary}")
     return 0
