@@ -1,0 +1,199 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Canonical Persona Editor</title>
+  <style>
+    :root { color-scheme: light dark; font-family: Inter, ui-sans-serif, system-ui, sans-serif; }
+    body { margin: 0; background: #0b1020; color: #eef2ff; }
+    main { max-width: 1180px; margin: 0 auto; padding: 28px 20px 56px; }
+    header, .toolbar, .summary { display: flex; justify-content: space-between; gap: 14px; align-items: center; }
+    h1 { margin: 0 0 8px; font-size: 28px; }
+    h2 { margin: 0 0 10px; font-size: 18px; }
+    p { color: #aeb8d4; line-height: 1.55; }
+    .card { background: #121a30; border: 1px solid #273452; border-radius: 15px; padding: 16px; }
+    .toolbar { align-items: end; margin-bottom: 16px; }
+    label { color: #aeb8d4; font-size: 14px; }
+    select, input, textarea, button { font: inherit; }
+    select, input, textarea { width: 100%; box-sizing: border-box; border: 1px solid #33446d; border-radius: 10px; padding: 10px; background: #0d1427; color: inherit; }
+    textarea { min-height: 560px; resize: vertical; font-family: ui-monospace, SFMono-Regular, Consolas, monospace; line-height: 1.45; }
+    button { background: #6478ff; color: white; border: 0; border-radius: 10px; padding: 10px 14px; cursor: pointer; }
+    button.secondary { background: #273452; }
+    button:disabled { opacity: .55; cursor: wait; }
+    .actions { display: flex; gap: 8px; flex-wrap: wrap; }
+    .grid { display: grid; grid-template-columns: minmax(0, 2fr) minmax(260px, 1fr); gap: 16px; }
+    .metric { font-size: 23px; font-weight: 700; }
+    .muted { color: #93a0bf; }
+    .ok { color: #6ee7b7; }
+    .error { color: #fca5a5; }
+    pre { white-space: pre-wrap; overflow-wrap: anywhere; background: #0b1123; border-radius: 12px; padding: 13px; color: #cbd5e1; }
+    ul { color: #aeb8d4; padding-left: 18px; }
+    @media (max-width: 800px) { .grid { grid-template-columns: 1fr; } header, .toolbar, .summary { align-items: stretch; flex-direction: column; } }
+  </style>
+</head>
+<body>
+<main>
+  <header>
+    <div>
+      <h1>Canonical Persona v3</h1>
+      <p>结构化编辑身份、表达、行为规则、边界、来源、置信度和场景测试。保存前会验证并创建备份。</p>
+    </div>
+    <a href="/" style="color:#c7d2fe">返回控制台</a>
+  </header>
+
+  <section class="toolbar card">
+    <label style="flex:1">Persona
+      <select id="persona"></select>
+    </label>
+    <label style="flex:1">远程访问令牌
+      <input id="token" type="password" placeholder="本机无需填写">
+    </label>
+    <div class="actions">
+      <button id="load" class="secondary" type="button">加载</button>
+      <button id="migrate" class="secondary" type="button">迁移到 v3</button>
+      <button id="save" type="button">验证并保存</button>
+    </div>
+  </section>
+
+  <section class="grid">
+    <article class="card">
+      <h2>Canonical JSON</h2>
+      <textarea id="editor" spellcheck="false" aria-label="Canonical Persona JSON"></textarea>
+    </article>
+    <aside>
+      <section class="card">
+        <div class="summary">
+          <div><div class="muted">Schema</div><div class="metric" id="schema">—</div></div>
+          <div><div class="muted">Behaviors</div><div class="metric" id="behaviors">—</div></div>
+          <div><div class="muted">Boundaries</div><div class="metric" id="boundaries">—</div></div>
+        </div>
+      </section>
+      <section class="card" style="margin-top:16px">
+        <h2>场景测试</h2>
+        <button id="run-tests" class="secondary" type="button">运行测试</button>
+        <pre id="tests">尚未运行</pre>
+      </section>
+      <section class="card" style="margin-top:16px">
+        <h2>状态</h2>
+        <pre id="status">选择 Persona 后加载</pre>
+      </section>
+      <section class="card" style="margin-top:16px">
+        <h2>编辑规则</h2>
+        <ul>
+          <li>Persona ID 不能在此页面修改。</li>
+          <li>高优先级行为应关联至少一个测试。</li>
+          <li><code>observed-evidence</code> 必须包含 evidence 引用。</li>
+          <li>共享 Memory 不在此页面直接编辑。</li>
+        </ul>
+      </section>
+    </aside>
+  </section>
+</main>
+<script>
+  const persona = document.getElementById('persona');
+  const token = document.getElementById('token');
+  const editor = document.getElementById('editor');
+  const status = document.getElementById('status');
+  const tests = document.getElementById('tests');
+
+  function headers(extra = {}) {
+    const value = token.value.trim();
+    return value ? { ...extra, Authorization: `Bearer ${value}` } : extra;
+  }
+
+  async function request(path, options = {}) {
+    const response = await fetch(path, { ...options, headers: headers(options.headers || {}) });
+    if (!response.ok) {
+      let detail = `${response.status} ${response.statusText}`;
+      try { detail = JSON.stringify((await response.json()).detail, null, 2); } catch (_) {}
+      throw new Error(detail);
+    }
+    return response.json();
+  }
+
+  function updateMetrics(value) {
+    document.getElementById('schema').textContent = value?.schema_version ?? '—';
+    document.getElementById('behaviors').textContent = value?.behaviors?.length ?? '—';
+    document.getElementById('boundaries').textContent = value?.boundaries?.length ?? '—';
+  }
+
+  async function loadPersonas() {
+    const values = await request('/api/personas');
+    persona.innerHTML = values.map(item => `<option value="${item.id}">${item.name} (${item.id}) · schema ${item.schema_version}</option>`).join('');
+    if (values.length) await loadModel();
+    else status.textContent = '尚未注册 Persona。';
+  }
+
+  async function loadModel() {
+    const id = persona.value;
+    if (!id) return;
+    try {
+      const value = await request(`/api/personas/${encodeURIComponent(id)}/canonical`);
+      editor.value = JSON.stringify(value, null, 2);
+      updateMetrics(value);
+      status.textContent = '已加载 Canonical Persona v3。';
+    } catch (error) {
+      editor.value = '';
+      updateMetrics(null);
+      status.textContent = `尚未迁移：${error}`;
+    }
+  }
+
+  async function migrate() {
+    const id = persona.value;
+    if (!id) return;
+    if (!window.confirm(`原地迁移 ${id} 到 Canonical Persona v3，并创建备份？`)) return;
+    try {
+      const result = await request(`/api/personas/${encodeURIComponent(id)}/migrate-v3`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ in_place: true, backup: true })
+      });
+      status.textContent = JSON.stringify(result, null, 2);
+      await loadPersonas();
+    } catch (error) {
+      status.textContent = `迁移失败：${error}`;
+    }
+  }
+
+  async function save() {
+    const id = persona.value;
+    if (!id) return;
+    let value;
+    try { value = JSON.parse(editor.value); }
+    catch (error) { status.textContent = `JSON 无效：${error}`; return; }
+    try {
+      const result = await request(`/api/personas/${encodeURIComponent(id)}/canonical`, {
+        method: 'PUT', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ model: value })
+      });
+      editor.value = JSON.stringify(result.model, null, 2);
+      updateMetrics(result.model);
+      status.textContent = `保存成功。备份：${result.backup}`;
+    } catch (error) {
+      status.textContent = `保存失败：${error}`;
+    }
+  }
+
+  async function runTests() {
+    const id = persona.value;
+    if (!id) return;
+    try {
+      const result = await request(`/api/personas/${encodeURIComponent(id)}/tests`);
+      tests.textContent = JSON.stringify(result, null, 2);
+      tests.className = result.ok ? 'ok' : 'error';
+    } catch (error) {
+      tests.textContent = String(error);
+      tests.className = 'error';
+    }
+  }
+
+  document.getElementById('load').addEventListener('click', loadModel);
+  document.getElementById('migrate').addEventListener('click', migrate);
+  document.getElementById('save').addEventListener('click', save);
+  document.getElementById('run-tests').addEventListener('click', runTests);
+  persona.addEventListener('change', loadModel);
+  loadPersonas().catch(error => { status.textContent = String(error); });
+</script>
+</body>
+</html>
