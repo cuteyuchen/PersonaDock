@@ -8,6 +8,7 @@ from typing import Annotated, Any
 from fastapi import Depends, Header, HTTPException
 
 from persona_dock import __version__
+from persona_dock.adapters.base import ADAPTER_API_VERSION
 from persona_dock.registry import RegistryService
 
 from .app import create_app as _create_base_app
@@ -43,11 +44,12 @@ def create_app(token: str | None = None):
         return {
             "status": "ok",
             "version": __version__,
-            "phase": 7,
+            "phase": 8,
             "control_plane": "local",
             "registry": RegistryService().summary(),
             "canonical_schema": 3,
             "persona_pack_format": 2,
+            "adapter_api_version": ADAPTER_API_VERSION,
             "hermes_native_adapter": True,
             "openclaw_native_adapter": True,
             "workspace_state_separation": True,
@@ -55,6 +57,10 @@ def create_app(token: str | None = None):
             "reviewed_session_summaries": True,
             "raw_session_sync": False,
             "raw_session_preview": "experimental-disabled-by-default",
+            "persona_pack_signatures": "detached-ed25519-v1",
+            "encrypted_private_backup": "aes-256-gcm-scrypt-v1",
+            "character_card_compatibility": ["v2-json", "v3-json", "png-import", "charx"],
+            "stable_1_0_contract": True,
         }
 
     register_v3_routes(app, require_token, RegistryService)

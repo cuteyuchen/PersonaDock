@@ -1,0 +1,53 @@
+name: PersonaDock 1.0 compatibility
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  python-contracts:
+    name: Python ${{ matrix.python-version }} contracts
+    runs-on: ubuntu-22.04
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.10", "3.11", "3.12", "3.13"]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+          cache: pip
+      - name: Install
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -e .[dev]
+      - name: Verify stable contracts
+        run: |
+          pytest -vv \
+            tests_v2/test_stability_v1.py \
+            tests_v2/test_workflow.py \
+            tests_v2/test_hermes_native.py \
+            tests_v2/test_openclaw_native.py
+
+  docker-adapters:
+    name: Native Docker Adapter contracts
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+      - name: Install
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -e .
+      - name: Show Docker environment
+        run: docker version
+      - name: Verify native Docker Adapters
+        run: python scripts/verify_docker_adapters.py
