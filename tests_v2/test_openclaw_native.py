@@ -235,7 +235,9 @@ def test_overlay_contains_only_persona_owned_workspace_files(tmp_path: Path, mon
         assert not (root / forbidden).exists()
     manifest = json.loads((root / "personadock-manifest.json").read_text(encoding="utf-8"))
     assert manifest["privacy"]["memory_included"] is False
-    assert "agentDir and OpenClaw configuration/state" in manifest["preserve"]
+    preserve = "\n".join(manifest["preserve"])
+    for marker in ("agentDir", "auth", "sessions", "transcripts", "indexes"):
+        assert marker in preserve
 
 
 def test_new_agent_requires_explicit_workspace(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
