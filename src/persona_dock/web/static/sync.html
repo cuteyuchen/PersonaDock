@@ -1,0 +1,329 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>PersonaDock · Sync Review Center</title>
+  <style>
+    :root { color-scheme: dark; font-family: Inter, ui-sans-serif, system-ui, sans-serif; }
+    * { box-sizing: border-box; }
+    body { margin: 0; background: #090f1f; color: #eef2ff; }
+    main { max-width: 1240px; margin: 0 auto; padding: 28px 20px 64px; }
+    header, .row, .section-head { display: flex; gap: 14px; align-items: center; justify-content: space-between; }
+    h1, h2, h3 { margin: 0; }
+    h1 { font-size: 30px; }
+    h2 { font-size: 19px; }
+    h3 { font-size: 16px; }
+    p, label, .muted { color: #aeb8d4; line-height: 1.5; }
+    a { color: #a5b4fc; }
+    .card { background: #121a30; border: 1px solid #293756; border-radius: 15px; padding: 16px; }
+    .section { margin-top: 22px; }
+    .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 14px; }
+    .metrics { grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); }
+    .metric { font-size: 27px; font-weight: 700; margin-top: 7px; }
+    .form-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 12px; }
+    label { display: grid; gap: 7px; font-size: 14px; }
+    input, select, textarea { width: 100%; border: 1px solid #33446d; border-radius: 10px; padding: 10px; background: #0d1427; color: inherit; font: inherit; }
+    textarea { min-height: 300px; font-family: ui-monospace, SFMono-Regular, Consolas, monospace; font-size: 13px; }
+    input[type="checkbox"] { width: auto; }
+    .check { display: flex; align-items: center; gap: 8px; }
+    button { background: #6478ff; color: white; border: 0; border-radius: 10px; padding: 10px 14px; cursor: pointer; }
+    button.secondary { background: #273452; }
+    button.danger { background: #b94b69; }
+    button.success { background: #178a69; }
+    button:disabled { opacity: .55; cursor: wait; }
+    .actions { display: flex; gap: 9px; flex-wrap: wrap; margin-top: 14px; }
+    .badge, .chip { border: 1px solid #33446d; border-radius: 999px; padding: 6px 10px; white-space: nowrap; }
+    .chip { padding: 3px 8px; font-size: 12px; }
+    .ready, .approved { color: #6ee7b7; }
+    .pending, .private { color: #fbbf24; }
+    .restricted, .conflict { color: #fca5a5; }
+    .internal { color: #93c5fd; }
+    .public { color: #a7f3d0; }
+    code { color: #c7d2fe; overflow-wrap: anywhere; }
+    pre { white-space: pre-wrap; overflow-wrap: anywhere; background: #080d1b; padding: 14px; border-radius: 12px; min-height: 130px; }
+    .item { display: grid; gap: 9px; }
+    .item p { margin: 0; color: #e2e8f0; white-space: pre-wrap; }
+    .meta { display: flex; gap: 7px; flex-wrap: wrap; }
+    .notice { border-left: 3px solid #fbbf24; padding-left: 12px; }
+    .tabs { display: flex; gap: 8px; flex-wrap: wrap; }
+    .tabs button.active { background: #6478ff; }
+    @media (max-width: 680px) { header, .row, .section-head { align-items: stretch; flex-direction: column; } }
+  </style>
+</head>
+<body>
+<main>
+  <header>
+    <div>
+      <h1>同步策略与审核中心</h1>
+      <p>跨 Hermes 与 OpenClaw 的记忆默认先进入审核队列。传播由内容指纹、来源和目标日志追踪；冲突不会静默覆盖，原始 Session 永不参与本阶段同步。</p>
+    </div>
+    <div class="badge" id="status">请选择 Persona</div>
+  </header>
+
+  <section class="card section">
+    <div class="form-grid">
+      <label>Persona
+        <select id="persona"><option value="">正在加载…</option></select>
+      </label>
+      <label>远程 API 令牌
+        <input id="token" type="password" autocomplete="off" placeholder="本机访问无需填写">
+      </label>
+    </div>
+    <div class="actions">
+      <button id="refresh" class="secondary">刷新审核中心</button>
+      <button id="collect">从绑定运行时拉取</button>
+      <a href="/">总览</a>
+      <a href="/canonical">Canonical</a>
+      <a href="/hermes">Hermes</a>
+      <a href="/openclaw">OpenClaw</a>
+    </div>
+  </section>
+
+  <section class="grid metrics section">
+    <article class="card"><div class="muted">待审核</div><div class="metric" id="pending-count">—</div></article>
+    <article class="card"><div class="muted">已批准</div><div class="metric" id="approved-count">—</div></article>
+    <article class="card"><div class="muted">冲突</div><div class="metric" id="conflict-count">—</div></article>
+    <article class="card"><div class="muted">记忆传播</div><div class="metric" id="memory-action-count">—</div></article>
+    <article class="card"><div class="muted">定义更新</div><div class="metric" id="definition-action-count">—</div></article>
+  </section>
+
+  <section class="card section">
+    <div class="section-head"><h2>SyncPolicy</h2><span class="muted">默认 review；自动批准默认关闭</span></div>
+    <textarea id="policy" spellcheck="false"></textarea>
+    <div class="actions">
+      <button id="save-policy">验证并保存策略</button>
+      <button id="review-mode" class="secondary">恢复安全 Review 模式</button>
+    </div>
+  </section>
+
+  <section class="section">
+    <div class="section-head">
+      <h2>记忆审核队列</h2>
+      <div class="tabs">
+        <button class="secondary active" data-filter="pending">待审核</button>
+        <button class="secondary" data-filter="approved">已批准</button>
+        <button class="secondary" data-filter="rejected">已拒绝</button>
+        <button class="secondary" data-filter="all">全部</button>
+      </div>
+    </div>
+    <div class="grid" id="memory-items"></div>
+  </section>
+
+  <section class="section">
+    <div class="section-head"><h2>冲突</h2><span class="muted">必须明确选择保留、替换或并存</span></div>
+    <div class="grid" id="conflicts"></div>
+  </section>
+
+  <section class="card section">
+    <div class="section-head"><h2>同步预览</h2><span class="muted">应用时会重新生成计划</span></div>
+    <div id="plan-summary" class="muted" style="margin-top:12px">尚未加载</div>
+    <pre id="plan">请选择 Persona</pre>
+    <div class="actions">
+      <label class="check"><input id="include-definitions" type="checkbox"> 同时部署过期的人格定义</label>
+      <button id="apply-sync" class="success">确认并应用同步</button>
+    </div>
+  </section>
+
+  <section class="card section">
+    <h2>操作结果</h2>
+    <pre id="output">尚未执行操作</pre>
+  </section>
+</main>
+<script>
+  const $ = id => document.getElementById(id);
+  let dashboard = null;
+  let memoryFilter = 'pending';
+
+  function headers(extra = {}) {
+    const token = $('token').value.trim();
+    return token ? { ...extra, Authorization: `Bearer ${token}` } : extra;
+  }
+  async function request(path, options = {}) {
+    const response = await fetch(path, { ...options, headers: headers(options.headers || {}) });
+    if (!response.ok) {
+      let detail = `${response.status} ${response.statusText}`;
+      try { detail = (await response.json()).detail || detail; } catch (_) {}
+      throw new Error(detail);
+    }
+    return response.json();
+  }
+  function escapeHtml(value) {
+    return String(value ?? '').replaceAll('&', '&amp;').replaceAll('<', '&lt;')
+      .replaceAll('>', '&gt;').replaceAll('"', '&quot;');
+  }
+  function personaId() {
+    const value = $('persona').value;
+    if (!value) throw new Error('请先选择 Persona');
+    return value;
+  }
+  async function post(path, body = {}) {
+    return request(path, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body)
+    });
+  }
+  async function put(path, body) {
+    return request(path, {
+      method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body)
+    });
+  }
+  function showOutput(value) {
+    $('output').textContent = typeof value === 'string' ? value : JSON.stringify(value, null, 2);
+  }
+
+  async function loadPersonas() {
+    const personas = await request('/api/personas');
+    $('persona').innerHTML = personas.length
+      ? '<option value="">选择 Persona</option>' + personas.map(item => `<option value="${escapeHtml(item.id)}">${escapeHtml(item.name)} · ${escapeHtml(item.id)}</option>`).join('')
+      : '<option value="">尚无 Persona</option>';
+  }
+
+  function memoryCard(item) {
+    const source = item.source_adapter || 'canonical';
+    const canReview = item.status === 'pending';
+    return `<article class="card item">
+      <div class="row"><h3>${escapeHtml(item.memory_type)}</h3><span class="chip ${escapeHtml(item.sensitivity)}">${escapeHtml(item.sensitivity)}</span></div>
+      <p>${escapeHtml(item.summary)}</p>
+      <div class="meta">
+        <span class="chip ${escapeHtml(item.status)}">${escapeHtml(item.status)}</span>
+        <span class="chip">${escapeHtml(source)}</span>
+        <span class="chip">${escapeHtml(item.sync_scope)}</span>
+      </div>
+      <div class="muted">来源：<code>${escapeHtml(item.source_path || item.source_record_id || 'Canonical')}</code></div>
+      <div class="muted">Key：<code>${escapeHtml(item.memory_key)}</code></div>
+      ${canReview ? `<div class="actions">
+        <button class="success" onclick="reviewMemory('${escapeHtml(item.id)}','approve')">批准并共享</button>
+        <button class="secondary" onclick="reviewMemory('${escapeHtml(item.id)}','approve-local')">批准但仅本地</button>
+        <button class="danger" onclick="reviewMemory('${escapeHtml(item.id)}','reject')">拒绝</button>
+      </div>` : ''}
+    </article>`;
+  }
+
+  function conflictCard(item) {
+    const details = item.details || {};
+    const candidate = details.candidate || {};
+    const existing = details.existing || {};
+    return `<article class="card item">
+      <div class="row"><h3>${escapeHtml(item.conflict_type)}</h3><span class="chip conflict">${escapeHtml(item.status)}</span></div>
+      <p><strong>候选：</strong>${escapeHtml(candidate.summary || item.candidate_id)}</p>
+      <p><strong>现有：</strong>${escapeHtml(existing.summary || item.existing_item_id || '无')}</p>
+      <div class="actions">
+        <button class="secondary" onclick="resolveConflict('${escapeHtml(item.id)}','keep-existing')">保留现有</button>
+        <button class="danger" onclick="resolveConflict('${escapeHtml(item.id)}','replace')">用候选替换</button>
+        <button onclick="resolveConflict('${escapeHtml(item.id)}','keep-both')">两者并存</button>
+      </div>
+    </article>`;
+  }
+
+  async function refresh() {
+    const id = personaId();
+    $('status').textContent = '正在加载…';
+    try {
+      const [value, items] = await Promise.all([
+        request(`/api/sync/${encodeURIComponent(id)}`),
+        request(`/api/sync/${encodeURIComponent(id)}/memory`)
+      ]);
+      dashboard = value;
+      $('status').textContent = `SyncPolicy · ${value.policy.config.mode}`;
+      $('status').className = 'badge ready';
+      $('pending-count').textContent = value.counts.pending;
+      $('approved-count').textContent = value.counts.approved;
+      $('conflict-count').textContent = value.counts.conflicts;
+      $('memory-action-count').textContent = value.counts.memory_actions;
+      $('definition-action-count').textContent = value.counts.definition_actions;
+      $('policy').value = JSON.stringify(value.policy.config, null, 2);
+      const filtered = memoryFilter === 'all' ? items : items.filter(item => item.status === memoryFilter);
+      $('memory-items').innerHTML = filtered.length ? filtered.map(memoryCard).join('') : '<div class="card muted">当前筛选没有记忆条目。</div>';
+      $('conflicts').innerHTML = value.conflicts.length ? value.conflicts.map(conflictCard).join('') : '<div class="card muted">没有未解决冲突。</div>';
+      const plan = value.plan;
+      $('plan-summary').textContent = `${plan.memory_actions.length} 条记忆传播，${plan.definition_actions.length} 个定义更新，${plan.skipped.length} 条跳过。`;
+      $('plan').textContent = JSON.stringify(plan, null, 2);
+      showOutput({ counts: value.counts, latest_runs: value.runs.slice(0, 5), propagation: value.propagation.slice(0, 10) });
+    } catch (error) {
+      $('status').textContent = '加载失败';
+      $('status').className = 'badge conflict';
+      showOutput(String(error));
+    }
+  }
+
+  window.reviewMemory = async (itemId, action) => {
+    try {
+      let value;
+      if (action === 'reject') {
+        const reason = prompt('拒绝原因（可留空）') || null;
+        value = await post(`/api/sync/memory/${encodeURIComponent(itemId)}/reject`, { reviewer: 'web', reason });
+      } else {
+        value = await post(`/api/sync/memory/${encodeURIComponent(itemId)}/approve`, {
+          reviewer: 'web', scope: action === 'approve-local' ? 'local-only' : 'shared'
+        });
+      }
+      showOutput(value);
+      await refresh();
+    } catch (error) { showOutput(String(error)); }
+  };
+
+  window.resolveConflict = async (conflictId, resolution) => {
+    if (!confirm(`确认冲突解决策略：${resolution}？`)) return;
+    try {
+      const value = await post(`/api/sync/conflicts/${encodeURIComponent(conflictId)}/resolve`, { resolution, reviewer: 'web' });
+      showOutput(value);
+      await refresh();
+    } catch (error) { showOutput(String(error)); }
+  };
+
+  $('refresh').addEventListener('click', refresh);
+  $('persona').addEventListener('change', () => { if ($('persona').value) refresh(); });
+  $('collect').addEventListener('click', async () => {
+    try {
+      showOutput('正在从绑定运行时拉取候选…');
+      const value = await post(`/api/sync/${encodeURIComponent(personaId())}/collect`);
+      showOutput(value);
+      await refresh();
+    } catch (error) { showOutput(String(error)); }
+  });
+  $('save-policy').addEventListener('click', async () => {
+    try {
+      const config = JSON.parse($('policy').value);
+      const value = await put(`/api/sync/${encodeURIComponent(personaId())}/policy`, { config, replace: true });
+      showOutput(value);
+      await refresh();
+    } catch (error) { showOutput(String(error)); }
+  });
+  $('review-mode').addEventListener('click', async () => {
+    const config = {
+      schema_version: 1,
+      mode: 'review',
+      pull: { enabled: true, adapters: ['hermes', 'openclaw'] },
+      push: { enabled: true, adapters: ['hermes', 'openclaw'], reviewed_only: true, echo_to_source: false },
+      auto_approve: { enabled: false, source_adapters: [], memory_types: [], max_sensitivity: 'internal' },
+      conflicts: { strategy: 'manual' },
+      definition_sync: { push: 'manual', pull: 'snapshot-review' }
+    };
+    try {
+      const value = await put(`/api/sync/${encodeURIComponent(personaId())}/policy`, { config, replace: true });
+      showOutput(value);
+      await refresh();
+    } catch (error) { showOutput(String(error)); }
+  });
+  $('apply-sync').addEventListener('click', async () => {
+    if (!confirm('确认按最新计划传播已审核记忆？勾选定义更新时还会执行平台原生部署。')) return;
+    try {
+      showOutput('正在重新生成并应用同步计划…');
+      const value = await post(`/api/sync/${encodeURIComponent(personaId())}/apply`, {
+        include_definitions: $('include-definitions').checked
+      });
+      showOutput(value);
+      await refresh();
+    } catch (error) { showOutput(String(error)); }
+  });
+  document.querySelectorAll('[data-filter]').forEach(button => button.addEventListener('click', () => {
+    document.querySelectorAll('[data-filter]').forEach(item => item.classList.remove('active'));
+    button.classList.add('active');
+    memoryFilter = button.dataset.filter;
+    if ($('persona').value) refresh();
+  }));
+  $('token').addEventListener('keydown', event => { if (event.key === 'Enter' && $('persona').value) refresh(); });
+  loadPersonas().catch(error => showOutput(String(error)));
+</script>
+</body>
+</html>
