@@ -41,8 +41,8 @@ Issues = "https://github.com/cuteyuchen/PersonaDock/issues"
 dev = ["pytest>=8.0"]
 
 [project.scripts]
-personadock = "persona_dock.stable_cli:main"
-pdock = "persona_dock.stable_cli:main"
+personadock = "persona_dock.console_cli:main"
+pdock = "persona_dock.console_cli:main"
 
 [tool.setuptools]
 package-dir = {"" = "src"}
@@ -55,6 +55,7 @@ include = ["persona_dock*"]
 persona_dock = [
   "data/*.json",
   "data/persona-builder/SKILL.md",
+  "data/persona-builder/references/*.md",
   "data/persona-builder/references/*.md",
   "web/static/*.html",
 ]
