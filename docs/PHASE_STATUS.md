@@ -13,7 +13,15 @@
 | Phase 5：OpenClaw 原生 Adapter | 已完成 | #19 | `bcfc442359159308759467b943a7176a779a76df` |
 | Phase 6：受控共享记忆同步 | 已完成 | #20 | `bb68484257182a6e9c0dd659b66d3a303cb9ba2c` |
 | Phase 7：会话摘要 | 已完成 | #21 | `4eadd0381bd28242bd49f1bffade87b97eb31f53` |
-| Phase 8：1.0 稳定化 | 进行中 | #22 | — |
+| Phase 8：1.0 稳定化 | 已完成 | #22 | `ecce08f1ca76eabec9cbf754526a0e74407ab591` |
+
+## 当前稳定契约
+
+- PersonaDock 应用版本：`1.0.0`
+- Canonical Persona Schema：v3
+- PersonaPack Manifest：v2
+- Adapter API：`1.0`
+- Registry Schema：v3
 
 ## 阶段规则
 
