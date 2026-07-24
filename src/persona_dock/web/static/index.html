@@ -1,0 +1,130 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>PersonaDock Control Plane</title>
+  <style>
+    :root { color-scheme: light dark; font-family: Inter, ui-sans-serif, system-ui, sans-serif; }
+    body { margin: 0; background: #0b1020; color: #eef2ff; }
+    main { max-width: 1080px; margin: 0 auto; padding: 32px 20px 56px; }
+    header { display: flex; justify-content: space-between; gap: 24px; align-items: flex-start; margin-bottom: 28px; }
+    h1 { margin: 0 0 8px; font-size: 30px; }
+    h2 { margin-top: 0; font-size: 18px; }
+    p { color: #aeb8d4; line-height: 1.6; }
+    .badge { border: 1px solid #33446d; border-radius: 999px; padding: 7px 11px; color: #b9c8f5; white-space: nowrap; }
+    .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 16px; }
+    .card { background: #121a30; border: 1px solid #273452; border-radius: 16px; padding: 18px; }
+    .metric { font-size: 24px; font-weight: 700; margin-top: 8px; }
+    .muted { color: #93a0bf; }
+    .status-ready { color: #6ee7b7; }
+    .status-needs-path { color: #fbbf24; }
+    .status-unavailable { color: #fca5a5; }
+    button, input { font: inherit; }
+    button { background: #6478ff; color: white; border: 0; border-radius: 10px; padding: 10px 14px; cursor: pointer; }
+    button:hover { background: #7888ff; }
+    input { width: 100%; box-sizing: border-box; border: 1px solid #33446d; border-radius: 10px; padding: 10px; background: #0d1427; color: inherit; }
+    .toolbar { display: flex; gap: 10px; align-items: end; margin-bottom: 18px; }
+    .toolbar label { flex: 1; color: #aeb8d4; font-size: 14px; }
+    code { color: #c7d2fe; }
+    pre { white-space: pre-wrap; overflow-wrap: anywhere; background: #0b1123; border-radius: 12px; padding: 14px; color: #cbd5e1; }
+    ul { padding-left: 18px; color: #aeb8d4; }
+    @media (max-width: 640px) { header, .toolbar { flex-direction: column; } .toolbar { align-items: stretch; } }
+  </style>
+</head>
+<body>
+<main>
+  <header>
+    <div>
+      <h1>PersonaDock Control Plane</h1>
+      <p>Phase 0：安全部署基础、环境诊断和本地 Web 控制台。此版本不会静默猜测不可信的 Hermes/OpenClaw 目录。</p>
+    </div>
+    <div class="badge" id="health-badge">正在连接…</div>
+  </header>
+
+  <section class="toolbar card">
+    <label>远程访问令牌（本机默认无需填写）
+      <input id="token" type="password" autocomplete="off" placeholder="Bearer token">
+    </label>
+    <button id="refresh" type="button">刷新诊断</button>
+  </section>
+
+  <section class="grid" id="metrics">
+    <article class="card"><div class="muted">PersonaDock</div><div class="metric" id="version">—</div></article>
+    <article class="card"><div class="muted">系统</div><div class="metric" id="system">—</div></article>
+    <article class="card"><div class="muted">部署模式</div><div class="metric">Plan first</div></article>
+  </section>
+
+  <section style="margin-top: 22px;">
+    <h2>Adapter 诊断</h2>
+    <div class="grid" id="adapters"></div>
+  </section>
+
+  <section class="card" style="margin-top: 22px;">
+    <h2>当前阶段的安全规则</h2>
+    <ul>
+      <li>显式 <code>--path</code> 优先。</li>
+      <li>未提供路径时，仅接受带有可信标志文件的唯一目录。</li>
+      <li>Docker 兼容模式必须显式指定容器内绝对路径。</li>
+      <li>执行部署前使用 <code>personadock deploy --dry-run</code> 查看文件级计划。</li>
+      <li>Hermes Profile 和 OpenClaw Agent 原生管理将在后续阶段实现。</li>
+    </ul>
+  </section>
+
+  <section class="card" style="margin-top: 22px;">
+    <h2>原始诊断数据</h2>
+    <pre id="raw">尚未加载</pre>
+  </section>
+</main>
+<script>
+  const tokenInput = document.getElementById('token');
+  const healthBadge = document.getElementById('health-badge');
+  const adapters = document.getElementById('adapters');
+  const raw = document.getElementById('raw');
+
+  function headers() {
+    const token = tokenInput.value.trim();
+    return token ? { Authorization: `Bearer ${token}` } : {};
+  }
+
+  async function request(path) {
+    const response = await fetch(path, { headers: headers() });
+    if (!response.ok) throw new Error(`${response.status} ${response.statusText}`);
+    return response.json();
+  }
+
+  function adapterCard(adapter) {
+    const statusClass = `status-${adapter.status}`;
+    const details = adapter.details || {};
+    return `<article class="card">
+      <div class="muted">${adapter.adapter}</div>
+      <div class="metric ${statusClass}">${adapter.status}</div>
+      <p>${adapter.message}</p>
+      ${details.target_path ? `<p><strong>目标：</strong><code>${details.target_path}</code></p>` : ''}
+      ${adapter.executable ? `<p><strong>命令：</strong><code>${adapter.executable}</code></p>` : ''}
+    </article>`;
+  }
+
+  async function refresh() {
+    healthBadge.textContent = '正在连接…';
+    try {
+      const [health, doctor] = await Promise.all([request('/api/health'), request('/api/doctor')]);
+      healthBadge.textContent = `运行正常 · Phase ${health.phase}`;
+      healthBadge.className = 'badge status-ready';
+      document.getElementById('version').textContent = doctor.personadock_version;
+      document.getElementById('system').textContent = `${doctor.system} ${doctor.machine}`;
+      adapters.innerHTML = doctor.adapters.map(adapterCard).join('');
+      raw.textContent = JSON.stringify(doctor, null, 2);
+    } catch (error) {
+      healthBadge.textContent = '连接失败';
+      healthBadge.className = 'badge status-unavailable';
+      raw.textContent = String(error);
+    }
+  }
+
+  document.getElementById('refresh').addEventListener('click', refresh);
+  tokenInput.addEventListener('keydown', event => { if (event.key === 'Enter') refresh(); });
+  refresh();
+</script>
+</body>
+</html>
