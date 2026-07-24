@@ -1,12 +1,37 @@
 from __future__ import annotations
 
+from dataclasses import replace
 from pathlib import Path
 from typing import Any
 
 from persona_dock import session_cli as _session_cli
+from persona_dock.adapters.hermes import HermesAdapter
+from persona_dock.adapters.openclaw import OpenClawAdapter
 from persona_dock.io import load_jsonl, write_jsonl
 from persona_dock.session_engine import SessionSummaryEngine as _BaseSessionSummaryEngine
 from persona_dock.session_models import render_session_handoff
+
+
+def _enable_session_capabilities(adapter_class: type[Any]) -> None:
+    if getattr(adapter_class, "_personadock_session_capabilities", False):
+        return
+    original = adapter_class.capabilities.fget
+    if original is None:
+        return
+
+    def capabilities(self: Any):
+        return replace(
+            original(self),
+            session_summary_pull=True,
+            raw_session_import=True,
+        )
+
+    adapter_class.capabilities = property(capabilities)
+    adapter_class._personadock_session_capabilities = True
+
+
+_enable_session_capabilities(HermesAdapter)
+_enable_session_capabilities(OpenClawAdapter)
 
 
 class SessionSummaryEngine(_BaseSessionSummaryEngine):
