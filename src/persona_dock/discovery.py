@@ -82,6 +82,8 @@ def _workspace_metadata(path: Path) -> dict[str, Any]:
 
 
 def _hermes_metadata(path: Path) -> dict[str, Any]:
+    # `profiles/` only proves that this is a Hermes profile container. It does
+    # not prove that the root itself is a valid default profile.
     markers = [
         "SOUL.md",
         "config.yaml",
@@ -89,7 +91,6 @@ def _hermes_metadata(path: Path) -> dict[str, Any]:
         "skills",
         "memories",
         "sessions",
-        "profiles",
     ]
     present = [name for name in markers if (path / name).exists()]
     skills = path / "skills"
