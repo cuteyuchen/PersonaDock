@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from importlib import metadata as importlib_metadata
 from typing import Any, Callable, Iterable
 
@@ -19,6 +19,27 @@ from persona_dock.adapters.openclaw import OpenClawAdapter
 AdapterFactory = Callable[..., PersonaAdapter]
 
 
+def _hermes_factory(**options: Any) -> PersonaAdapter:
+    adapter = HermesAdapter(**options)
+    adapter.display_name = "Hermes Agent"
+    adapter.transports = ("local", "docker")
+    return adapter
+
+
+def _openclaw_factory(**options: Any) -> PersonaAdapter:
+    adapter = OpenClawAdapter(**options)
+    adapter.display_name = "OpenClaw"
+    adapter.transports = ("local", "docker", "ssh")
+    return adapter
+
+
+def _generic_factory(**_: Any) -> PersonaAdapter:
+    adapter = LegacyFilesystemAdapter("generic")
+    adapter.display_name = "Generic filesystem"
+    adapter.transports = ("local", "docker")
+    return adapter
+
+
 @dataclass(frozen=True)
 class RegisteredAdapter:
     name: str
@@ -35,19 +56,19 @@ class AdapterRegistry:
         self._plugin_errors: list[dict[str, str]] = []
         self.register(
             "hermes",
-            HermesAdapter,
+            _hermes_factory,
             builtin=True,
             metadata={"platform": "Hermes Agent", "contract": "native-profile"},
         )
         self.register(
             "openclaw",
-            OpenClawAdapter,
+            _openclaw_factory,
             builtin=True,
             metadata={"platform": "OpenClaw", "contract": "native-agent-workspace"},
         )
         self.register(
             "generic-filesystem",
-            lambda **_: LegacyFilesystemAdapter("generic"),
+            _generic_factory,
             builtin=True,
             metadata={"platform": "Generic filesystem", "contract": "compatibility"},
         )
@@ -115,8 +136,7 @@ class AdapterRegistry:
                         ),
                     },
                 )
-                # Validate once without transport-specific arguments. Plugins that
-                # require constructor arguments must expose a zero-argument factory.
+                # Plugins requiring constructor arguments must expose a zero-argument factory.
                 self.create(entry_point.name)
             except Exception as error:
                 self._adapters.pop(str(entry_point.name).strip().lower(), None)
@@ -148,7 +168,10 @@ class AdapterRegistry:
             "registry_name": normalized,
             "adapter_api": ADAPTER_API_VERSION,
         }
-        return adapter.descriptor(builtin=registered.builtin, metadata=metadata)
+        descriptor = adapter.descriptor(
+            builtin=registered.builtin, metadata=metadata
+        )
+        return replace(descriptor, name=normalized)
 
     def descriptors(self) -> list[AdapterDescriptor]:
         values: list[AdapterDescriptor] = []
