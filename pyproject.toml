@@ -4,15 +4,15 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "persona-dock"
-version = "0.1.0"
-description = "Local-first toolkit for creating, packaging, and managing portable AI personas."
+version = "1.0.0"
+description = "Local-first control plane for portable, reviewable AI personas."
 readme = "README.md"
 requires-python = ">=3.10"
 license = { text = "MIT" }
 authors = [{ name = "cuteyuchen" }]
 keywords = ["ai", "agent", "persona", "soul", "skills", "memory", "hermes", "openclaw"]
 classifiers = [
-  "Development Status :: 3 - Alpha",
+  "Development Status :: 5 - Production/Stable",
   "Environment :: Console",
   "Intended Audience :: Developers",
   "License :: OSI Approved :: MIT License",
@@ -29,6 +29,7 @@ dependencies = [
   "jsonschema>=4.20",
   "fastapi>=0.115,<1",
   "uvicorn>=0.30,<1",
+  "cryptography>=46,<50",
 ]
 
 [project.urls]
@@ -40,8 +41,11 @@ Issues = "https://github.com/cuteyuchen/PersonaDock/issues"
 dev = ["pytest>=8.0"]
 
 [project.scripts]
-personadock = "persona_dock.session_runtime:main"
-pdock = "persona_dock.session_runtime:main"
+personadock = "persona_dock.stable_cli:main"
+pdock = "persona_dock.stable_cli:main"
+
+[project.entry-points."personadock.adapters"]
+# External packages may register PersonaAdapter factories in this group.
 
 [tool.setuptools]
 package-dir = {"" = "src"}
