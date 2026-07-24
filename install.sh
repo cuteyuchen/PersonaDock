@@ -10,7 +10,7 @@ usage() {
 Install the PersonaDock standalone executable.
 
 Usage:
-  install.sh [--version v0.1.0] [--install-dir PATH]
+  install.sh [--version v1.0.0] [--install-dir PATH]
 
 Environment variables:
   PERSONADOCK_VERSION      Release tag, or "latest" (default)
@@ -79,55 +79,60 @@ else
   base_url="https://github.com/${REPOSITORY}/releases/download/${VERSION}"
 fi
 
-tmp_dir="$(mktemp -d 2>/dev/null || mktemp -d -t personadock)"
-trap 'rm -rf "$tmp_dir"' EXIT HUP INT TERM
+temporary="$(mktemp -d 2>/dev/null || mktemp -d -t personadock)"
+trap 'rm -rf "$temporary"' EXIT HUP INT TERM
 
-archive_path="${tmp_dir}/${asset}"
-checksums_path="${tmp_dir}/SHA256SUMS"
+archive="$temporary/$asset"
+checksums="$temporary/SHA256SUMS"
 
-printf 'Downloading %s...\n' "$asset"
-curl --fail --location --silent --show-error "${base_url}/${asset}" --output "$archive_path"
-curl --fail --location --silent --show-error "${base_url}/SHA256SUMS" --output "$checksums_path"
+echo "Downloading $asset..."
+curl -fsSL "$base_url/$asset" -o "$archive"
+curl -fsSL "$base_url/SHA256SUMS" -o "$checksums"
 
-expected="$(awk -v name="$asset" '$2 == name || $2 == "*" name { print $1; exit }' "$checksums_path")"
+expected="$(awk -v name="$asset" '$2 == name || $2 == "*" name {print $1; exit}' "$checksums")"
 [ -n "$expected" ] || {
-  echo "SHA256SUMS does not contain ${asset}." >&2
+  echo "SHA256SUMS does not contain $asset." >&2
   exit 1
 }
 
 if command -v sha256sum >/dev/null 2>&1; then
-  actual="$(sha256sum "$archive_path" | awk '{print $1}')"
+  actual="$(sha256sum "$archive" | awk '{print $1}')"
 elif command -v shasum >/dev/null 2>&1; then
-  actual="$(shasum -a 256 "$archive_path" | awk '{print $1}')"
+  actual="$(shasum -a 256 "$archive" | awk '{print $1}')"
 else
   echo "sha256sum or shasum is required to verify the download." >&2
   exit 1
 fi
 
 [ "$actual" = "$expected" ] || {
-  echo "Checksum verification failed for ${asset}." >&2
+  echo "Checksum verification failed for $asset." >&2
   exit 1
 }
 
-tar -xzf "$archive_path" -C "$tmp_dir"
-[ -f "${tmp_dir}/personadock" ] || {
+mkdir -p "$temporary/extracted"
+tar -xzf "$archive" -C "$temporary/extracted"
+source_binary="$temporary/extracted/personadock"
+[ -f "$source_binary" ] || {
   echo "The release archive does not contain personadock." >&2
   exit 1
 }
 
 mkdir -p "$INSTALL_DIR"
-install -m 0755 "${tmp_dir}/personadock" "${INSTALL_DIR}/personadock"
+destination="$INSTALL_DIR/personadock"
+cp "$source_binary" "$destination"
+chmod 755 "$destination"
 
 if [ "$platform" = "macos" ] && command -v xattr >/dev/null 2>&1; then
-  xattr -d com.apple.quarantine "${INSTALL_DIR}/personadock" 2>/dev/null || true
+  xattr -d com.apple.quarantine "$destination" >/dev/null 2>&1 || true
 fi
 
-"${INSTALL_DIR}/personadock" --help >/dev/null
+"$destination" --help >/dev/null
 
-printf 'PersonaDock installed to %s\n' "${INSTALL_DIR}/personadock"
-case ":${PATH}:" in
-  *":${INSTALL_DIR}:"*) ;;
+echo "PersonaDock installed at $destination"
+case ":${PATH:-}:" in
+  *":$INSTALL_DIR:"*) ;;
   *)
-    printf 'Add this directory to PATH:\n  export PATH="%s:$PATH"\n' "$INSTALL_DIR"
+    echo "Add $INSTALL_DIR to PATH, for example:"
+    echo "  export PATH=\"$INSTALL_DIR:\$PATH\""
     ;;
 esac
