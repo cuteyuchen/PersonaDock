@@ -90,24 +90,28 @@ def _verify_web(binary: Path) -> None:
                 health = json.loads(health_body.decode("utf-8"))
                 if health.get("status") != "ok":
                     raise AssertionError(f"unexpected health response: {health}")
-                if health.get("phase", 0) < 6:
-                    raise AssertionError(f"standalone Web health is not Phase 6: {health}")
+                if health.get("phase", 0) < 7:
+                    raise AssertionError(f"standalone Web health is not Phase 7: {health}")
                 for marker in (
                     "hermes_native_adapter",
                     "openclaw_native_adapter",
                     "workspace_state_separation",
                     "governed_memory_sync",
+                    "reviewed_session_summaries",
                 ):
                     if health.get(marker) is not True:
                         raise AssertionError(f"health flag is missing: {marker}: {health}")
                 if health.get("raw_session_sync") is not False:
                     raise AssertionError(f"raw session sync safety flag is invalid: {health}")
+                if health.get("raw_session_preview") != "experimental-disabled-by-default":
+                    raise AssertionError(f"raw preview safety flag is invalid: {health}")
 
                 _verify_page(port, "/", "PersonaDock Control Plane")
                 _verify_page(port, "/canonical", "Canonical Persona")
                 _verify_page(port, "/hermes", "Hermes 原生 Profile 管理")
                 _verify_page(port, "/openclaw", "OpenClaw 原生 Agent 管理")
                 _verify_page(port, "/sync", "同步策略与审核中心")
+                _verify_page(port, "/sessions", "Session Summary 审核中心")
                 return
             except Exception as error:
                 last_error = error
@@ -149,7 +153,7 @@ def main() -> int:
         skill_root = runtime_root / "installed-skills"
 
         main_help = _run_help(binary, runtime_root, ["--help"])
-        for marker in ("hermes", "openclaw", "sync"):
+        for marker in ("hermes", "openclaw", "sync", "session"):
             if marker not in main_help:
                 raise AssertionError(f"standalone CLI does not expose command: {marker}")
 
@@ -167,6 +171,11 @@ def main() -> int:
         for marker in ("policy", "collect", "candidates", "review", "conflicts", "plan", "apply", "status"):
             if marker not in sync_help:
                 raise AssertionError(f"standalone sync CLI marker is missing: {marker}")
+
+        session_help = _run_help(binary, runtime_root, ["session", "--help"])
+        for marker in ("policy", "collect", "list", "add", "review", "plan", "apply", "preview", "status"):
+            if marker not in session_help:
+                raise AssertionError(f"standalone Session Summary CLI marker is missing: {marker}")
 
         deploy_help = _run_help(binary, runtime_root, ["deploy", "--help"])
         for marker in (
@@ -203,9 +212,11 @@ def main() -> int:
             if (
                 adapter is None
                 or adapter.get("capabilities", {}).get("native_deployment") is not True
+                or adapter.get("capabilities", {}).get("session_summary_pull") is not True
+                or adapter.get("capabilities", {}).get("raw_session_import") is not True
             ):
                 raise AssertionError(
-                    f"standalone doctor does not expose native {adapter_name} capability"
+                    f"standalone doctor does not expose Phase 7 {adapter_name} capabilities"
                 )
         openclaw = next(
             item
