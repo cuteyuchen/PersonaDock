@@ -96,8 +96,10 @@ def inspect_package(package: Path) -> dict[str, Any]:
             mismatches.append(f"unexpected file: {name}")
         manifest["integrity"] = "ok" if not mismatches else "failed"
         manifest["integrity_errors"] = mismatches
-        manifest["package_sha256"] = sha256_file(package)
-        return manifest
+    # On Windows a second open can fail while ZipFile still owns the archive
+    # handle. Hash the complete package only after leaving the ZIP context.
+    manifest["package_sha256"] = sha256_file(package)
+    return manifest
 
 
 def extract_package(package: Path, destination: Path) -> dict[str, Any]:
