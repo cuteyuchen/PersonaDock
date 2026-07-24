@@ -21,11 +21,11 @@ def test_registry_initialization_is_repeatable(tmp_path: Path) -> None:
     database = RegistryDatabase(tmp_path / "personadock.db")
     database.initialize()
     database.initialize()
-    assert database.schema_version() == SCHEMA_VERSION == 2
+    assert database.schema_version() == SCHEMA_VERSION == 3
 
     service = RegistryService(database)
     assert service.summary() == {
-        "schema_version": 2,
+        "schema_version": 3,
         "personas": 0,
         "instances": 0,
         "managed_instances": 0,

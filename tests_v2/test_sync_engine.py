@@ -62,7 +62,7 @@ def _runtime(
     return instance
 
 
-def test_registry_v1_database_migrates_to_sync_schema_v2(tmp_path: Path) -> None:
+def test_registry_v1_database_migrates_to_cumulative_schema_v3(tmp_path: Path) -> None:
     path = tmp_path / "personadock.db"
     connection = sqlite3.connect(path)
     connection.execute("CREATE TABLE registry_meta(key TEXT PRIMARY KEY, value TEXT NOT NULL)")
@@ -72,7 +72,7 @@ def test_registry_v1_database_migrates_to_sync_schema_v2(tmp_path: Path) -> None
 
     database = RegistryDatabase(path)
     database.initialize()
-    assert database.schema_version() == 2
+    assert database.schema_version() == 3
     with database.session() as migrated:
         tables = {
             row[0]
@@ -86,6 +86,9 @@ def test_registry_v1_database_migrates_to_sync_schema_v2(tmp_path: Path) -> None
         "sync_conflicts",
         "sync_runs",
         "propagation_log",
+        "session_summary_policies",
+        "session_summaries",
+        "session_summary_propagation",
     } <= tables
 
 

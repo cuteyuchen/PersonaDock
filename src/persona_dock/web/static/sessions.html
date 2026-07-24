@@ -1,0 +1,116 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>PersonaDock Session Summary 审核中心</title>
+  <style>
+    :root { color-scheme: light dark; font-family: Inter, system-ui, sans-serif; }
+    body { margin: 0; background: Canvas; color: CanvasText; }
+    main { max-width: 1180px; margin: auto; padding: 24px; }
+    h1 { margin-bottom: 6px; }
+    .muted { opacity: .72; }
+    .warning { border-left: 4px solid #d97706; padding: 12px; background: color-mix(in srgb, #d97706 12%, Canvas); }
+    .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(310px, 1fr)); gap: 16px; margin-top: 18px; }
+    section { border: 1px solid color-mix(in srgb, CanvasText 18%, transparent); border-radius: 12px; padding: 16px; }
+    label { display: block; font-size: .9rem; margin: 10px 0 4px; }
+    input, select, textarea, button { width: 100%; box-sizing: border-box; font: inherit; padding: 9px; }
+    textarea { min-height: 120px; }
+    button { margin-top: 9px; cursor: pointer; }
+    .row { display: flex; gap: 8px; }
+    .row > * { flex: 1; }
+    pre { white-space: pre-wrap; word-break: break-word; max-height: 420px; overflow: auto; }
+    .item { border-top: 1px solid color-mix(in srgb, CanvasText 16%, transparent); padding: 12px 0; }
+    .item:first-child { border-top: 0; }
+    .pill { display: inline-block; padding: 2px 7px; border-radius: 999px; background: color-mix(in srgb, CanvasText 10%, transparent); font-size: .8rem; margin-right: 4px; }
+  </style>
+</head>
+<body>
+<main>
+  <h1>Session Summary 审核中心</h1>
+  <p class="muted">采集平台已有摘要、审核任务与情绪交接，再显式传播到绑定运行时。</p>
+  <p class="warning"><strong>安全边界：</strong>默认不读取或同步原始 Session/Transcript。实验性预览需要策略开启和单次明确确认，并排除系统消息、工具调用、工具结果与内部推理。</p>
+
+  <div class="grid">
+    <section>
+      <h2>Persona 与操作</h2>
+      <label for="persona">Persona ID</label>
+      <input id="persona" placeholder="xiaoyou">
+      <div class="row">
+        <button onclick="loadDashboard()">刷新</button>
+        <button onclick="collect()">采集摘要</button>
+      </div>
+      <button onclick="previewPlan()">预览传播计划</button>
+      <button onclick="applyPlan()">确认并应用传播</button>
+      <pre id="status">等待操作</pre>
+    </section>
+
+    <section>
+      <h2>手动摘要</h2>
+      <label for="title">标题</label>
+      <input id="title" value="Manual summary">
+      <label for="summary">摘要</label>
+      <textarea id="summary" placeholder="只写需要交接的事实、上下文和结论"></textarea>
+      <label for="tasks">待办（每行一个）</label>
+      <textarea id="tasks" placeholder="下一步任务"></textarea>
+      <div class="row">
+        <div><label for="emotion">情绪标签</label><input id="emotion"></div>
+        <div><label for="sensitivity">敏感度</label><select id="sensitivity"><option>internal</option><option>public</option><option>private</option><option>restricted</option></select></div>
+      </div>
+      <button onclick="addManual()">加入待审核队列</button>
+    </section>
+
+    <section>
+      <h2>实验性原始预览</h2>
+      <p class="muted">只在策略已启用时工作；内容不会写入 PersonaDock Registry。</p>
+      <label for="runtime">Runtime Instance ID</label>
+      <input id="runtime">
+      <label for="sessionId">Session / Transcript Selector</label>
+      <input id="sessionId">
+      <button onclick="rawPreview()">我理解风险，执行一次预览</button>
+      <pre id="preview"></pre>
+    </section>
+  </div>
+
+  <section style="margin-top:16px">
+    <div class="row"><h2 style="flex:3">审核队列</h2><select id="filter" onchange="loadDashboard()"><option value="">全部</option><option>pending</option><option>approved</option><option>rejected</option></select></div>
+    <div id="items" class="muted">尚未加载</div>
+  </section>
+</main>
+<script>
+const $ = id => document.getElementById(id);
+const persona = () => $('persona').value.trim();
+async function api(path, options={}) {
+  const response = await fetch(path, {headers:{'Content-Type':'application/json'}, ...options});
+  const value = await response.json().catch(() => ({}));
+  if (!response.ok) throw new Error(value.detail || JSON.stringify(value));
+  return value;
+}
+function show(value) { $('status').textContent = JSON.stringify(value, null, 2); }
+async function loadDashboard() {
+  try {
+    const value = await api(`/api/sessions/${encodeURIComponent(persona())}`);
+    show(value);
+    const filter = $('filter').value;
+    const items = filter ? value.summaries.filter(item => item.status === filter) : value.summaries;
+    $('items').innerHTML = items.length ? items.map(renderItem).join('') : '<p>没有记录。</p>';
+  } catch (error) { show({error:String(error)}); }
+}
+function renderItem(item) {
+  const tasks = item.pending_tasks?.length ? `<p><strong>待办：</strong>${item.pending_tasks.map(escapeHtml).join('；')}</p>` : '';
+  const actions = item.status === 'pending' ? `<div class="row"><button onclick="review('${item.id}','approve','shared')">批准并共享</button><button onclick="review('${item.id}','approve','local-only')">仅本地批准</button><button onclick="review('${item.id}','reject')">拒绝</button></div>` : '';
+  return `<div class="item"><span class="pill">${escapeHtml(item.status)}</span><span class="pill">${escapeHtml(item.source_adapter)}</span><span class="pill">${escapeHtml(item.sensitivity)}</span><h3>${escapeHtml(item.source_title)}</h3><p>${escapeHtml(item.summary)}</p>${tasks}${actions}</div>`;
+}
+const escapeHtml = value => String(value ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+async function collect() { try { show(await api(`/api/sessions/${encodeURIComponent(persona())}/collect`, {method:'POST'})); await loadDashboard(); } catch(error){show({error:String(error)})} }
+async function addManual() {
+  const body = {summary:$('summary').value,title:$('title').value,pending_tasks:$('tasks').value.split('\n').map(v=>v.trim()).filter(Boolean),emotional_context:$('emotion').value?{label:$('emotion').value}:{},sensitivity:$('sensitivity').value};
+  try { show(await api(`/api/sessions/${encodeURIComponent(persona())}/manual`, {method:'POST',body:JSON.stringify(body)})); await loadDashboard(); } catch(error){show({error:String(error)})}
+}
+async function review(id, action, scope='shared') { try { show(await api(`/api/session-summaries/${id}/${action}`, {method:'POST',body:JSON.stringify({reviewer:'web',scope})})); await loadDashboard(); } catch(error){show({error:String(error)})} }
+async function previewPlan() { try { show(await api(`/api/sessions/${encodeURIComponent(persona())}/plan`)); } catch(error){show({error:String(error)})} }
+async function applyPlan() { if(!confirm('只传播已审核摘要，继续？')) return; try { show(await api(`/api/sessions/${encodeURIComponent(persona())}/apply`, {method:'POST',body:JSON.stringify({confirmed:true})})); await loadDashboard(); } catch(error){show({error:String(error)})} }
+async function rawPreview() { if(!confirm('实验性预览可能读取原始会话。只显示已过滤并脱敏的用户/助手消息，继续？')) return; try { const value = await api(`/api/sessions/${encodeURIComponent(persona())}/preview`, {method:'POST',body:JSON.stringify({runtime_instance_id:$('runtime').value,session_id:$('sessionId').value,experimental:true})}); $('preview').textContent=JSON.stringify(value,null,2); } catch(error){$('preview').textContent=String(error)} }
+</script>
+</body>
+</html>

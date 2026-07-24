@@ -13,6 +13,7 @@ from persona_dock.registry import RegistryService
 from .app import create_app as _create_base_app
 from .hermes_api import register_hermes_routes
 from .openclaw_api import register_openclaw_routes
+from .session_api import register_session_routes
 from .sync_api import register_sync_routes
 from .v3_api import register_v3_routes
 
@@ -42,7 +43,7 @@ def create_app(token: str | None = None):
         return {
             "status": "ok",
             "version": __version__,
-            "phase": 6,
+            "phase": 7,
             "control_plane": "local",
             "registry": RegistryService().summary(),
             "canonical_schema": 3,
@@ -51,13 +52,16 @@ def create_app(token: str | None = None):
             "openclaw_native_adapter": True,
             "workspace_state_separation": True,
             "governed_memory_sync": True,
+            "reviewed_session_summaries": True,
             "raw_session_sync": False,
+            "raw_session_preview": "experimental-disabled-by-default",
         }
 
     register_v3_routes(app, require_token, RegistryService)
     register_hermes_routes(app, require_token, RegistryService)
     register_openclaw_routes(app, require_token, RegistryService)
     register_sync_routes(app, require_token, RegistryService)
+    register_session_routes(app, require_token, RegistryService)
     return app
 
 
@@ -95,6 +99,7 @@ def run_server(
     print(f"Hermes native Profile manager: {url}/hermes")
     print(f"OpenClaw native Agent manager: {url}/openclaw")
     print(f"Sync policy and review center: {url}/sync")
+    print(f"Session Summary review center: {url}/sessions")
     if token:
         print("API bearer-token authentication is enabled.")
     uvicorn.run(create_app(token=token), host=host, port=port, log_level="info")
