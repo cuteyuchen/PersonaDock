@@ -6,12 +6,17 @@ import sys
 from pathlib import Path
 
 from .compiler import compile_project
+from .deployment.plans import apply_deployment_plan, build_deployment_plan
 from .distill import distill_chat
-from .installer import install_package, rollback, status, uninstall
+from .doctor import doctor_report, render_doctor
+from .installer import rollback, status, uninstall
 from .packaging import export_public, inspect_package, pack_project
 from .project import find_project, init_project, validate_project
 from .skill_install import TARGETS as SKILL_TARGETS
 from .skill_install import install_skill
+
+
+AGENT_TARGETS = ["hermes", "openclaw", "generic"]
 
 
 def _print_status() -> int:
@@ -36,10 +41,78 @@ def _destination(path: str | None, container: str | None) -> str | Path | None:
     return path if container else Path(path)
 
 
+def _add_deployment_arguments(command: argparse.ArgumentParser) -> None:
+    command.add_argument("package")
+    command.add_argument("--target", required=True, choices=AGENT_TARGETS)
+    command.add_argument(
+        "--path",
+        help="explicit host destination, or an absolute path inside --container",
+    )
+    command.add_argument(
+        "--container",
+        help="running Docker container name; legacy Docker mode requires --path",
+    )
+    command.add_argument("--dry-run", action="store_true", help="print the plan without writing files")
+    command.add_argument("--yes", action="store_true", help="apply the plan without an interactive prompt")
+    command.add_argument("--json", action="store_true", help="print the deployment plan as JSON")
+
+
+def _print_plan(plan: dict[str, object]) -> None:
+    print(f"PersonaPack: {plan['package_id']}@{plan['package_version']}")
+    print(f"Target: {plan['target']} via {plan['adapter']}")
+    if plan.get("container"):
+        print(f"Destination: docker://{plan['container']}{plan['destination']}")
+    else:
+        print(f"Destination: {plan['destination']}")
+    print(f"Resolution source: {plan['destination_source']}")
+    print("\nOperations:")
+    operations = plan.get("operations", [])
+    for operation in operations:
+        marker = "replace" if operation.get("exists") is True else "create"
+        if operation.get("exists") is None:
+            marker = "inspect during apply"
+        print(f"- {marker}: {operation['destination']}")
+    print("\nPreserved:")
+    for item in plan.get("preserves", []):
+        print(f"- {item}")
+    print("\nWarnings:")
+    for item in plan.get("warnings", []):
+        print(f"- {item}")
+
+
+def _run_deployment(args: argparse.Namespace) -> int:
+    plan = build_deployment_plan(
+        Path(args.package),
+        args.target,
+        _destination(args.path, args.container),
+        args.container,
+    )
+    rendered = plan.to_dict()
+    if args.json:
+        print(json.dumps(rendered, ensure_ascii=False, indent=2))
+    else:
+        _print_plan(rendered)
+
+    if args.dry_run:
+        return 0
+
+    if not args.yes:
+        if not sys.stdin.isatty():
+            raise ValueError("deployment requires --yes when standard input is not interactive")
+        answer = input("\nApply this deployment plan? [y/N] ").strip().lower()
+        if answer not in {"y", "yes"}:
+            print("Deployment cancelled.")
+            return 1
+
+    result = apply_deployment_plan(plan)
+    print(f"\nInstalled at {result}")
+    return 0
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="personadock",
-        description="Create, package, and install private portable AI personas.",
+        description="Build and manage portable AI personas through a local control plane.",
     )
     sub = parser.add_subparsers(dest="command", required=True)
 
@@ -77,30 +150,36 @@ def build_parser() -> argparse.ArgumentParser:
     command = sub.add_parser("build", help="compile SOUL, Skill, and Memory targets")
     command.add_argument("project", nargs="?", default=".")
     command.add_argument("--output")
-    command.add_argument("--target", action="append", choices=["hermes", "openclaw", "generic"])
+    command.add_argument("--target", action="append", choices=AGENT_TARGETS)
 
     command = sub.add_parser("pack", help="create a portable .personapack archive")
     command.add_argument("project", nargs="?", default=".")
     command.add_argument("--output")
-    command.add_argument("--target", action="append", choices=["hermes", "openclaw", "generic"])
+    command.add_argument("--target", action="append", choices=AGENT_TARGETS)
 
     command = sub.add_parser("inspect", help="verify and show PersonaPack metadata")
     command.add_argument("package")
 
-    command = sub.add_parser("install", help="install a PersonaPack into an agent")
-    command.add_argument("package")
-    command.add_argument("--target", required=True, choices=["hermes", "openclaw", "generic"])
-    command.add_argument(
-        "--path",
-        help="custom host destination, or an absolute path inside --container",
+    command = sub.add_parser("doctor", help="inspect platform commands and safe deployment targets")
+    command.add_argument("--json", action="store_true")
+
+    command = sub.add_parser("deploy", help="plan and deploy a PersonaPack safely")
+    _add_deployment_arguments(command)
+
+    command = sub.add_parser(
+        "install",
+        help="deprecated alias for deploy; retained for migration compatibility",
     )
-    command.add_argument(
-        "--container",
-        help="running Docker container name; install through docker exec and docker cp",
-    )
+    _add_deployment_arguments(command)
+
+    command = sub.add_parser("serve", help="start the local PersonaDock Web control plane")
+    command.add_argument("--host", default="127.0.0.1")
+    command.add_argument("--port", type=int, default=8732)
+    command.add_argument("--token", help="bearer token; required for non-loopback bindings")
+    command.add_argument("--no-browser", action="store_true")
 
     command = sub.add_parser("rollback", help="restore files replaced by PersonaDock")
-    command.add_argument("--target", required=True, choices=["hermes", "openclaw", "generic"])
+    command.add_argument("--target", required=True, choices=AGENT_TARGETS)
     command.add_argument(
         "--path",
         help="custom host destination, or the same absolute path used inside --container",
@@ -108,7 +187,7 @@ def build_parser() -> argparse.ArgumentParser:
     command.add_argument("--container", help="running Docker container used for the installation")
 
     command = sub.add_parser("uninstall", help="remove an installed persona")
-    command.add_argument("--target", required=True, choices=["hermes", "openclaw", "generic"])
+    command.add_argument("--target", required=True, choices=AGENT_TARGETS)
     command.add_argument(
         "--path",
         help="custom host destination, or the same absolute path used inside --container",
@@ -164,14 +243,23 @@ def main(argv: list[str] | None = None) -> int:
     if args.command == "inspect":
         print(json.dumps(inspect_package(Path(args.package)), ensure_ascii=False, indent=2))
         return 0
-    if args.command == "install":
-        result = install_package(
-            Path(args.package),
-            args.target,
-            _destination(args.path, args.container),
-            args.container,
+    if args.command == "doctor":
+        report = doctor_report()
+        print(json.dumps(report, ensure_ascii=False, indent=2) if args.json else render_doctor(report))
+        return 0
+    if args.command in {"deploy", "install"}:
+        if args.command == "install":
+            print("Warning: `personadock install` is deprecated; use `personadock deploy`.", file=sys.stderr)
+        return _run_deployment(args)
+    if args.command == "serve":
+        from .web import run_server
+
+        run_server(
+            host=args.host,
+            port=args.port,
+            token=args.token,
+            open_browser=not args.no_browser,
         )
-        print(result)
         return 0
     if args.command == "rollback":
         print(rollback(args.target, _destination(args.path, args.container), args.container))
