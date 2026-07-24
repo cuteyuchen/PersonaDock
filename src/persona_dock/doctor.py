@@ -5,12 +5,13 @@ import sys
 from typing import Any
 
 from persona_dock import __version__
+from persona_dock.adapters.hermes import HermesAdapter
 from persona_dock.adapters.legacy_filesystem import LegacyFilesystemAdapter
 
 
 def doctor_report() -> dict[str, Any]:
     adapters = [
-        LegacyFilesystemAdapter("hermes").doctor(),
+        HermesAdapter().doctor(),
         LegacyFilesystemAdapter("openclaw").doctor(),
         LegacyFilesystemAdapter("generic").doctor(),
     ]
@@ -48,4 +49,6 @@ def render_doctor(report: dict[str, Any]) -> str:
         target_path = adapter.get("details", {}).get("target_path")
         if target_path:
             lines.append(f"  target: {target_path}")
+        if adapter.get("details", {}).get("native"):
+            lines.append("  deployment: native Hermes Profile Distribution")
     return "\n".join(lines)

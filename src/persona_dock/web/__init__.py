@@ -11,6 +11,7 @@ from persona_dock import __version__
 from persona_dock.registry import RegistryService
 
 from .app import create_app as _create_base_app
+from .hermes_api import register_hermes_routes
 from .v3_api import register_v3_routes
 
 
@@ -25,12 +26,13 @@ def create_app(token: str | None = None):
         if authorization != f"Bearer {token}":
             raise HTTPException(status_code=401, detail="invalid or missing bearer token")
 
-    # Replace the previous phase health route while retaining the same security
-    # dependency and stable public URL.
     app.router.routes = [
         route
         for route in app.router.routes
-        if not (getattr(route, "path", None) == "/api/health" and "GET" in getattr(route, "methods", set()))
+        if not (
+            getattr(route, "path", None) == "/api/health"
+            and "GET" in getattr(route, "methods", set())
+        )
     ]
 
     @app.get("/api/health")
@@ -38,14 +40,17 @@ def create_app(token: str | None = None):
         return {
             "status": "ok",
             "version": __version__,
-            "phase": 3,
+            "phase": 4,
             "control_plane": "local",
             "registry": RegistryService().summary(),
             "canonical_schema": 3,
             "persona_pack_format": 2,
+            "hermes_native_adapter": True,
+            "openclaw_native_adapter": False,
         }
 
     register_v3_routes(app, require_token, RegistryService)
+    register_hermes_routes(app, require_token, RegistryService)
     return app
 
 
@@ -80,6 +85,7 @@ def run_server(
 
     print(f"PersonaDock Web control plane: {url}")
     print(f"Canonical Persona editor: {url}/canonical")
+    print(f"Hermes native Profile manager: {url}/hermes")
     if token:
         print("API bearer-token authentication is enabled.")
     uvicorn.run(create_app(token=token), host=host, port=port, log_level="info")
