@@ -1,3 +1,3 @@
-from persona_dock.stable_cli import main
+from persona_dock.console_cli import main
 
 raise SystemExit(main())
