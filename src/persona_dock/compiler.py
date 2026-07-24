@@ -5,6 +5,7 @@ import shutil
 from pathlib import Path
 from typing import Any
 
+from .core.models import normalize_canonical_persona
 from .io import load_jsonl, load_yaml, sha256_file, write_jsonl
 from .project import PROJECT_FILE, find_project, validate_project
 
@@ -13,7 +14,7 @@ def _bullets(values: list[Any]) -> str:
     return "\n".join(f"- {value}" for value in values)
 
 
-def compile_soul(project: dict[str, Any]) -> str:
+def _compile_soul_v2(project: dict[str, Any]) -> str:
     soul = project["soul"]
     skill_id = project["skill"]["id"]
     triggers = soul.get("skill_triggers", [])
@@ -49,6 +50,83 @@ SOUL 只负责稳定身份、路由和边界；详细场景、表达示例和关
 """.strip() + "\n"
 
 
+def _behavior_summary(item: dict[str, Any]) -> str:
+    trigger = item.get("trigger", {})
+    conditions = trigger.get("conditions", [])
+    actions = item.get("behavior", [])
+    constraints = item.get("constraints", [])
+    parts = [f"触发：{trigger.get('intent', 'general')}"]
+    if conditions:
+        parts.append("条件：" + "；".join(str(value) for value in conditions))
+    if actions:
+        parts.append("行为：" + "；".join(str(value) for value in actions))
+    if constraints:
+        parts.append("限制：" + "；".join(str(value) for value in constraints))
+    return " | ".join(parts)
+
+
+def _compile_soul_v3(project: dict[str, Any]) -> str:
+    project = normalize_canonical_persona(project)
+    skill_id = project["skill"]["id"]
+    identity = project["identity"]
+    voice = project["voice"]
+    boundaries = [
+        f"[{item['priority']}] {item['rule']}"
+        for item in sorted(
+            project["boundaries"],
+            key=lambda value: ({"critical": 0, "high": 1, "medium": 2, "low": 3}[value["priority"]], value["id"]),
+        )
+    ]
+    routes = [
+        f"`{item['id']}`：{_behavior_summary(item)}"
+        for item in sorted(
+            project["behaviors"],
+            key=lambda value: ({"critical": 0, "high": 1, "medium": 2, "low": 3}[value["priority"]], value["id"]),
+        )
+    ]
+    return f"""# {project['name']}
+
+## 身份
+
+{identity['statement']}
+
+## 核心人格
+
+{_bullets(identity['core_traits'])}
+
+## 表达
+
+{voice['style']}
+
+表达原则：
+
+{_bullets(voice['principles'])}
+
+## 不可违反的边界
+
+{_bullets(boundaries)}
+
+## 人格行为路由
+
+你拥有 `{skill_id}` Skill。根据以下结构化规则判断场景并按需读取 Skill references：
+
+{_bullets(routes)}
+
+涉及过去经历、用户偏好、共同事件或关系事实时，先检索 Memory。没有可靠记忆时必须明确不确定，不得补全或假装记得。
+
+SOUL 只保留稳定身份、表达原则、边界和行为路由；详细规则、示例和证据保留在 Canonical Persona、人格 Skill 和私有证据库中。
+""".strip() + "\n"
+
+
+def compile_soul(project: dict[str, Any]) -> str:
+    version = int(project.get("schema_version", 0))
+    if version == 2:
+        return _compile_soul_v2(project)
+    if version == 3:
+        return _compile_soul_v3(project)
+    raise ValueError(f"unsupported schema_version: {version}")
+
+
 def _memory_markdown(profile: dict[str, Any], records: list[dict[str, Any]], limit: int = 2200) -> str:
     sections = ["# PersonaDock Memory Seed", ""]
     for key, title in [
@@ -64,7 +142,11 @@ def _memory_markdown(profile: dict[str, Any], records: list[dict[str, Any]], lim
         sections.extend(["## 已审核记忆", ""])
         for item in reviewed:
             summary = item.get("summary") or item.get("text") or ""
-            sections.append(f"- [{item.get('id', 'memory')}] {summary}")
+            source = item.get("source")
+            source_note = ""
+            if isinstance(source, dict):
+                source_note = f" ({source.get('adapter', 'local')}:{source.get('platform_instance_id', 'source')})"
+            sections.append(f"- [{item.get('id', 'memory')}] {summary}{source_note}")
     content = "\n".join(sections).strip() + "\n"
     if len(content) <= limit:
         return content
@@ -80,8 +162,14 @@ def _copy_skill(root: Path, target: Path, project: dict[str, Any]) -> None:
 
 def _copy_memory(root: Path, target: Path, project: dict[str, Any]) -> None:
     profile = load_yaml(root / "memory/profile.yaml")
-    records = load_jsonl(root / "memory/seed.jsonl")
-    reviewed = [record for record in records if record.get("reviewed") is True]
+    seed_records = load_jsonl(root / "memory/seed.jsonl")
+    shared_path = root / "memory/shared.jsonl"
+    shared_records = load_jsonl(shared_path) if shared_path.is_file() else []
+    reviewed = [
+        record
+        for record in [*seed_records, *shared_records]
+        if record.get("reviewed") is True and record.get("status", "active") == "active"
+    ]
     memory_dir = target / "memory"
     memory_dir.mkdir(parents=True, exist_ok=True)
     (memory_dir / "MEMORY.md").write_text(_memory_markdown(profile, reviewed), encoding="utf-8")
@@ -95,6 +183,7 @@ def compile_project(root: Path, output: Path | None = None, targets: list[str] |
     if errors:
         raise ValueError("invalid persona project:\n- " + "\n- ".join(errors))
     project = load_yaml(root / PROJECT_FILE)
+    schema_version = int(project.get("schema_version", 0))
     selected = targets or list(project.get("targets", []))
     supported = {"hermes", "openclaw", "generic"}
     unknown = set(selected) - supported
@@ -107,7 +196,8 @@ def compile_project(root: Path, output: Path | None = None, targets: list[str] |
     output.mkdir(parents=True)
 
     soul = compile_soul(project)
-    hard_limit = int(project["soul"].get("hard_limit_chars", 2800))
+    budgets = project["soul"] if schema_version == 2 else project["budgets"]
+    hard_limit = int(budgets.get("hard_limit_chars", 2800))
     if len(soul) > hard_limit:
         raise ValueError(f"compiled SOUL is {len(soul)} characters; hard limit is {hard_limit}")
 
@@ -128,6 +218,7 @@ def compile_project(root: Path, output: Path | None = None, targets: list[str] |
         target_manifest[target_name] = {
             "path": f"targets/{target_name}",
             "soul_chars": len(soul),
+            "adapter_contract": "canonical-persona-v3" if schema_version == 3 else "legacy-v2",
         }
 
     source_dir = output / "source"
@@ -142,17 +233,25 @@ def compile_project(root: Path, output: Path | None = None, targets: list[str] |
         files[path.relative_to(output).as_posix()] = sha256_file(path)
     manifest = {
         "format": "personapack",
-        "format_version": 1,
-        "schema_version": 2,
+        "format_version": 2 if schema_version == 3 else 1,
+        "schema_version": schema_version,
         "id": project["id"],
         "name": project["name"],
         "version": project["version"],
         "locale": project["locale"],
         "summary": project["summary"],
         "targets": target_manifest,
+        "canonical": {
+            "behavior_rules": len(project.get("behaviors", [])) if schema_version == 3 else None,
+            "boundaries": len(project.get("boundaries", [])) if schema_version == 3 else None,
+            "source_types": sorted(
+                {item.get("source_type") for item in project.get("behaviors", []) if item.get("source_type")}
+            ) if schema_version == 3 else [],
+        },
         "privacy": {
             "raw_chat_included": False,
             "memory_policy": project.get("memory", {}).get("bundle_policy", "reviewed"),
+            "unreviewed_memory_included": False,
         },
         "files": files,
     }
