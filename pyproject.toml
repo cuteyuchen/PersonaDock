@@ -40,8 +40,8 @@ Issues = "https://github.com/cuteyuchen/PersonaDock/issues"
 dev = ["pytest>=8.0"]
 
 [project.scripts]
-personadock = "persona_dock.hermes_cli:main"
-pdock = "persona_dock.hermes_cli:main"
+personadock = "persona_dock.openclaw_cli:main"
+pdock = "persona_dock.openclaw_cli:main"
 
 [tool.setuptools]
 package-dir = {"" = "src"}
