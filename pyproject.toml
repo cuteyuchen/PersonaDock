@@ -40,8 +40,8 @@ Issues = "https://github.com/cuteyuchen/PersonaDock/issues"
 dev = ["pytest>=8.0"]
 
 [project.scripts]
-personadock = "persona_dock.sync_cli:main"
-pdock = "persona_dock.sync_cli:main"
+personadock = "persona_dock.session_runtime:main"
+pdock = "persona_dock.session_runtime:main"
 
 [tool.setuptools]
 package-dir = {"" = "src"}
