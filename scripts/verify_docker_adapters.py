@@ -111,9 +111,9 @@ fi
 
             source = root / "source.txt"
             source.write_text("PersonaDock Docker round trip", encoding="utf-8")
-            hermes.runner.copy_to(source, "/tmp/hermes-round-trip.txt")
+            hermes.runner.docker_copy_to(source, "/tmp/hermes-round-trip.txt")
             hermes_copy = root / "hermes-copy.txt"
-            hermes.runner.copy_from("/tmp/hermes-round-trip.txt", hermes_copy)
+            hermes.runner.docker_copy_from("/tmp/hermes-round-trip.txt", hermes_copy)
             if hermes_copy.read_text(encoding="utf-8") != source.read_text(encoding="utf-8"):
                 raise AssertionError("Hermes Docker copy round trip changed content")
 
