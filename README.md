@@ -2,31 +2,36 @@
 
 **PersonaDock 是一个本地优先的 AI 人格控制平面。**
 
-它使用 Canonical Persona v3 管理人格定义、Skill、已审核 Memory 和 Session Summary，并通过原生 Adapter 安全部署到 Hermes 与 OpenClaw。PersonaDock 不托管云端人格服务，不自动上传聊天，不把认证、原始 Session 或运行时 State 打进 PersonaPack。
+它把自然语言、聊天记录和既有 Hermes/OpenClaw 人格转换为可审核、可测试、可版本化、可导出、可部署和可同步的 Canonical Persona。PersonaDock 不托管云端人格服务，不自动上传聊天，也不会把认证、原始 Session、Transcript 或运行时 State 打进 PersonaPack。
 
-## 1.0 能力
+## 核心能力
 
-- Canonical Persona Schema v3。
+- Canonical Persona Schema v3 与确定性场景测试。
 - Persona Registry、Runtime Discovery、Binding、Snapshot 和 Journal。
-- Hermes 原生 Profile Distribution：Plan、Apply、Verify、Snapshot、Rollback。
-- OpenClaw 原生 Agent/Workspace Overlay：本机、Docker、SSH。
-- Review-first 跨运行时 Memory 同步。
-- Reviewed Session Summary 交接；原始 Session 同步关闭。
-- PersonaPack Manifest v2、确定性归档和分离式 Ed25519 签名。
-- Scrypt + AES-256-GCM 私有工程备份。
+- Hermes 原生 Profile Distribution 部署、验证和回滚。
+- OpenClaw 原生 Agent/Workspace 部署，支持本机、Docker 和 SSH。
+- Review-first 跨运行时 Memory 同步、冲突处理和循环抑制。
+- Reviewed Session Summary 交接；原始 Session/Transcript 同步关闭。
+- PersonaPack Manifest v2、严格完整性验证和分离式 Ed25519 签名。
+- Scrypt + AES-256-GCM 私有 Persona 工程备份。
 - Character Card V1/V2/V3、PNG Metadata 和 CHARX 兼容。
-- 稳定 Adapter API `1.0` 和第三方 Entry Point 插件机制。
-- 本地 Web 控制台。
+- Adapter API 1.0 与第三方 Entry Point 插件。
 - Linux x86_64/ARM64、macOS Intel/Apple Silicon、Windows x86_64 独立程序。
 
 ## 安装
 
-PersonaDock 通过 GitHub Release 发布独立可执行文件，不要求用户预装 Python。
+PersonaDock 通过 GitHub Release 发布独立可执行文件，不要求预装 Python。
 
-### Linux / macOS
+Linux / macOS：
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/cuteyuchen/PersonaDock/main/install.sh | sh
+```
+
+Windows PowerShell：
+
+```powershell
+irm https://raw.githubusercontent.com/cuteyuchen/PersonaDock/main/install.ps1 | iex
 ```
 
 安装固定版本：
@@ -36,32 +41,12 @@ curl -fsSL https://raw.githubusercontent.com/cuteyuchen/PersonaDock/main/install
   | sh -s -- --version v1.0.0
 ```
 
-默认路径：
-
-```text
-~/.local/bin/personadock
-```
-
-### Windows PowerShell
-
-```powershell
-irm https://raw.githubusercontent.com/cuteyuchen/PersonaDock/main/install.ps1 | iex
-```
-
-安装固定版本：
-
 ```powershell
 $env:PERSONADOCK_VERSION = "v1.0.0"
 irm https://raw.githubusercontent.com/cuteyuchen/PersonaDock/main/install.ps1 | iex
 ```
 
-默认路径：
-
-```text
-%LOCALAPPDATA%\Programs\PersonaDock\personadock.exe
-```
-
-### 验证
+验证：
 
 ```bash
 personadock --version
@@ -69,7 +54,7 @@ personadock doctor --json
 personadock adapter list
 ```
 
-安装脚本会下载对应平台资产和 `SHA256SUMS`，验证哈希后再安装。
+安装脚本会下载对应平台资产和 `SHA256SUMS`，校验后再安装。
 
 ## 创建 Persona
 
@@ -81,7 +66,7 @@ personadock skill install --target claude --scope global
 personadock skill install --target opencode --scope global
 ```
 
-该 Skill 自动选择内部模式：
+该 Skill 自动选择：
 
 | 模式 | 输入 |
 |---|---|
@@ -98,23 +83,9 @@ personadock validate ./xiaoyou
 personadock test ./xiaoyou
 ```
 
-工程结构：
+工程中的 `.private/` 保存原始资料、证据和未审核候选，不进入默认 PersonaPack。
 
-```text
-xiaoyou/
-├── companion.yaml
-├── skills/persona/
-├── memory/
-│   ├── seed.jsonl
-│   ├── session-summaries.jsonl
-│   └── policy.yaml
-├── tests/scenarios.yaml
-└── .private/
-```
-
-`.private/` 保存原始资料、证据和未审核候选，不进入默认 PersonaPack。
-
-## 打包 PersonaPack
+## 打包与信任
 
 ```bash
 personadock build ./xiaoyou
@@ -122,24 +93,15 @@ personadock pack ./xiaoyou --output ./xiaoyou.personapack
 personadock inspect ./xiaoyou.personapack
 ```
 
-PersonaPack 只包含 Adapter 所有权定义文件和已审核的允许内容，不包含运行时认证、原始 Session、Transcript 或 State。
-
-## PersonaPack 签名
-
-生成 Ed25519 Key：
+生成签名密钥并签名：
 
 ```bash
 personadock trust keygen ~/.config/personadock/signing.pem
-```
-
-签名：
-
-```bash
 personadock trust sign ./xiaoyou.personapack \
   --key ~/.config/personadock/signing.pem
 ```
 
-验证完整性和可信 Key：
+验证完整性、兼容性和可信 Key：
 
 ```bash
 personadock trust verify ./xiaoyou.personapack \
@@ -148,11 +110,11 @@ personadock trust verify ./xiaoyou.personapack \
   --json
 ```
 
-签名文件中携带的公钥不会自动被信任；可信 Key 必须由用户显式提供。
+签名中携带的公钥不会自动被信任，可信 Key 必须由用户显式提供。
 
 ## 部署到 Hermes
 
-先预览：
+预览：
 
 ```bash
 personadock deploy ./xiaoyou.personapack \
@@ -171,20 +133,35 @@ personadock deploy ./xiaoyou.personapack \
   --yes
 ```
 
-更新既有 Profile 前会创建 Hermes 原生导出快照；失败时自动恢复。Memory、Sessions、`.env` 和认证不属于 Persona Definition 所有权。
+更新前会创建 Hermes 原生导出快照，失败时自动恢复。Memory、Sessions、`.env` 和认证不属于 Persona Definition 所有权。
+
+Docker：
+
+```bash
+personadock deploy ./xiaoyou.personapack \
+  --target hermes \
+  --profile xiaoyou \
+  --container hermes-agent \
+  --yes
+```
 
 ## 部署到 OpenClaw
 
-预览既有 Agent：
+更新已有 Agent：
 
 ```bash
 personadock deploy ./xiaoyou.personapack \
   --target openclaw \
   --agent xiaoyou \
   --dry-run --json
+
+personadock deploy ./xiaoyou.personapack \
+  --target openclaw \
+  --agent xiaoyou \
+  --yes
 ```
 
-创建新 Agent 需要显式 Workspace：
+创建新 Agent 必须提供绝对 Workspace：
 
 ```bash
 personadock deploy ./xiaoyou.personapack \
@@ -196,18 +173,15 @@ personadock deploy ./xiaoyou.personapack \
 
 PersonaDock 只管理 `SOUL.md`、`IDENTITY.md`、一个 Persona Skill 和所有权 Manifest。`AGENTS.md`、`USER.md`、`TOOLS.md`、Memory、Agent State、Auth 和 Sessions 保留。
 
+Docker/SSH 示例见 [Docker 与远程运行时](docs/docker-install.md)。
+
 ## Memory 同步
 
 ```bash
 personadock sync collect xiaoyou
 personadock sync candidates xiaoyou --status pending
+personadock sync review approve <memory-item-id> --reviewer user --scope shared
 personadock sync plan xiaoyou
-```
-
-批准后应用：
-
-```bash
-personadock sync review approve <memory-item-id> --reviewer user
 personadock sync apply xiaoyou --yes
 ```
 
@@ -237,49 +211,35 @@ personadock session apply xiaoyou --yes
 export PERSONADOCK_BACKUP_PASSWORD='a-long-unique-password'
 personadock backup create ./xiaoyou \
   --output ./xiaoyou-private.pdbackup
+
+personadock backup restore \
+  ./xiaoyou-private.pdbackup \
+  ./xiaoyou-restored
 ```
 
-恢复：
-
-```bash
-personadock backup restore ./xiaoyou-private.pdbackup ./xiaoyou-restored
-```
-
-私有备份包含 Persona 工程和 `.private/`，使用 Scrypt + AES-256-GCM；它只读取 Persona 工程，不扫描 Hermes/OpenClaw 运行时状态。
+备份使用 Scrypt + AES-256-GCM，只读取 Persona 工程，不扫描 Hermes/OpenClaw 运行时状态。签名私钥不会被自动加入备份。
 
 ## Character Card
 
-导入 V2/V3 JSON、PNG Metadata 或 CHARX：
-
 ```bash
 personadock character-card import ./rin.json ./rin-persona --id rin
-```
 
-导出 V3 JSON：
-
-```bash
 personadock character-card export ./rin-persona \
   --output ./rin-v3.json \
   --card-version 3
-```
 
-导出 CHARX：
-
-```bash
 personadock character-card export ./rin-persona \
   --output ./rin.charx \
   --charx
 ```
 
-未知 Character Card Extensions 会保存在私有导入记录中并在导出时恢复。Memory 和 Session 不进入 Character Card。
+未知 Extensions 会在私有导入记录中保存并在导出时恢复。Memory 和 Session 不进入 Character Card。
 
 ## Web 控制台
 
 ```bash
 personadock serve
 ```
-
-默认页面：
 
 ```text
 http://127.0.0.1:8732/
@@ -294,8 +254,6 @@ http://127.0.0.1:8732/sessions
 
 ## Adapter 插件
 
-查看稳定 API：
-
 ```bash
 personadock adapter list --json
 personadock adapter show hermes --json
@@ -308,20 +266,24 @@ personadock adapter show hermes --json
 my-runtime = "my_package.adapter:MyAdapter"
 ```
 
-插件必须实现 `PersonaAdapter` API `1.x`。Major 不匹配时拒绝加载，插件失败不会影响内置 Adapter。
+插件必须实现 Adapter API `1.x`。Major 不匹配时拒绝加载，单个插件失败不会影响内置 Adapter。
 
 ## 文档
 
+完整导航：[docs/README.md](docs/README.md)
+
+常用文档：
+
+- [控制平面总览](docs/control-plane.md)
 - [Canonical Persona v3](docs/canonical-persona-v3.md)
+- [Registry 与运行实例发现](docs/registry-discovery.md)
 - [Hermes 原生 Adapter](docs/hermes-native-adapter.md)
 - [OpenClaw 原生 Adapter](docs/openclaw-native-adapter.md)
-- [受控 Memory 同步](docs/governed-memory-sync.md)
-- [Session Summary](docs/session-summaries.md)
+- [受控 Memory 同步](docs/governed-sync.md)
+- [Reviewed Session Summaries](docs/session-summaries.md)
 - [1.0 兼容承诺](docs/compatibility.md)
-- [信任与私有备份](docs/trust-and-private-backup.md)
-- [Character Card 兼容](docs/character-card-compatibility.md)
-- [OpenPersona 研究](docs/openpersona-compatibility.md)
 - [迁移与回滚](docs/migration-and-rollback.md)
+- [维护审计](docs/maintenance-audit.md)
 
 ## 1.0 验收矩阵
 
@@ -333,7 +295,7 @@ my-runtime = "my_package.adapter:MyAdapter"
 - Linux x86_64 / ARM64。
 - macOS Intel / Apple Silicon。
 - Windows x86_64。
-- 独立程序真实签名、备份、恢复和 Character Card 工作流。
+- 独立程序签名、备份、恢复和 Character Card 工作流。
 - Release 资产 SHA-256 汇总。
 
 ## License

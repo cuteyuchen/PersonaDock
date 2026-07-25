@@ -1,119 +1,180 @@
-# PersonaDock Control Plane（Phase 0）
+# PersonaDock 1.0 控制平面
 
-Phase 0 建立了安全部署计划、本地 Web 控制台和共享 Doctor 服务。
+PersonaDock 是本地优先的 AI 人格控制平面。它把 Persona 定义、运行时绑定、部署、Memory 审核、Session Summary 交接、快照和回滚统一到同一套 Core API，并同时提供 CLI 与本地 Web 控制台。
+
+## 核心架构
+
+```text
+CLI / Web Console
+        ↓
+Application Services
+Registry · Adoption · Deployment · Review · Sync · Session
+        ↓
+Canonical Persona Core
+Schema · Migration · Diff · Test · Package · Trust
+        ↓
+Hermes Adapter                  OpenClaw Adapter
+Profile Distribution            Agent / Workspace Overlay
+        ↓
+Local Registry · Persona Projects · Snapshots · Journal
+```
+
+## 数据边界
+
+### PersonaDock 管理
+
+- Canonical Persona Schema v3。
+- Persona Skill 和 PersonaDock 所有权文件。
+- 已审核的共享 Memory。
+- 已审核的 Session Summary Handoff。
+- Runtime Binding、Snapshot、Journal、冲突和传播记录。
+- PersonaPack Manifest v2、签名和私有工程备份。
+
+### PersonaDock 不管理
+
+- API Key、OAuth、Provider 或 Gateway Token。
+- Hermes/OpenClaw 的认证文件和运行时 State。
+- 原始 Session、Transcript、工具调用和内部推理。
+- OpenClaw 的 `AGENTS.md`、`USER.md`、`TOOLS.md` 等平台专属文件。
+- 非 PersonaDock 所有权的 Skills 和 Memory 内容。
+
+## 安全工作流
+
+所有平台写入遵循：
+
+```text
+Doctor / Discovery
+        ↓
+Deployment Plan
+        ↓
+用户确认或 --yes
+        ↓
+Snapshot
+        ↓
+Apply
+        ↓
+Verify
+        ↓
+Registry Binding + Journal
+        ↓
+失败时 Rollback
+```
+
+不可信或不明确的目标不会被静默选中。Hermes 和 OpenClaw 默认使用平台原生 CLI；文件系统部署只能通过显式兼容模式使用。
 
 ## 环境诊断
 
 ```bash
 personadock doctor
 personadock doctor --json
+personadock adapter list
+personadock adapter doctor hermes --json
+personadock adapter doctor openclaw --json
 ```
 
 Doctor 会显示：
 
-- PersonaDock 和系统信息。
-- Hermes/OpenClaw 命令是否可用。
-- 是否检测到唯一可信的数据目录或 Workspace。
-- 当前 Adapter 能力。
-- 需要显式 `--path` 的情况。
+- PersonaDock、Python/独立程序和系统信息。
+- Hermes/OpenClaw 命令与版本是否可用。
+- Adapter 能力和 Transport。
+- 本机目标是否可信且唯一。
+- 需要显式参数或人工处理的冲突。
 
-PersonaDock 不再因为没有提供路径就直接写入 `~/.hermes`。Windows 下会检查 `%LOCALAPPDATA%\hermes` 和用户目录候选，但只有存在可信 Hermes 标志文件时才会选中。
+## Persona 与 Runtime Registry
 
-## 部署预览
+```bash
+personadock persona list
+personadock discover
+personadock instances
+personadock instances --unmanaged
+```
+
+Registry 默认位于：
+
+```text
+~/.personadock/personadock.db
+```
+
+可以通过 `PERSONADOCK_HOME` 指向其他状态目录。Registry 保存 Persona、Runtime Instance、Binding、Snapshot 元数据、Journal、Memory Review 和 Session Summary 记录，不保存原始会话。
+
+## 部署
+
+Hermes：
 
 ```bash
 personadock deploy ./persona.personapack \
   --target hermes \
-  --path /srv/hermes \
-  --dry-run
-```
+  --profile xiaoyou \
+  --dry-run --json
 
-Windows：
-
-```powershell
-personadock deploy .\persona.personapack `
-  --target hermes `
-  --path "$env:LOCALAPPDATA\hermes" `
-  --dry-run
-```
-
-预览会列出：
-
-- PersonaPack ID 和版本。
-- Adapter 和目标解析来源。
-- 将创建或替换的每个文件。
-- 明确保留的平台状态。
-- Legacy Filesystem Adapter 警告。
-
-确认无误后执行：
-
-```bash
 personadock deploy ./persona.personapack \
   --target hermes \
-  --path /srv/hermes
-```
-
-非交互环境必须显式允许：
-
-```bash
-personadock deploy ./persona.personapack \
-  --target hermes \
-  --path /srv/hermes \
+  --profile xiaoyou \
   --yes
 ```
 
-旧命令仍可使用，但会显示弃用提示：
-
-```bash
-personadock install ...
-```
-
-## Docker 兼容模式
-
-原生 Hermes/OpenClaw Docker Adapter 尚未实现。Phase 0 的 Legacy Filesystem Adapter 要求显式指定容器内绝对路径：
+OpenClaw：
 
 ```bash
 personadock deploy ./persona.personapack \
-  --target hermes \
-  --container hermes-app \
-  --path /root/.hermes \
-  --dry-run
+  --target openclaw \
+  --agent xiaoyou \
+  --dry-run --json
+
+personadock deploy ./persona.personapack \
+  --target openclaw \
+  --agent xiaoyou \
+  --yes
 ```
 
-不提供 `--path` 会直接停止，避免把平台目录猜错。
+`personadock install` 仍作为 1.x 迁移别名保留，但新文档和自动化应使用 `deploy`。
 
-## 本地 Web 控制台
+## Memory 与 Session Summary
+
+Memory：
+
+```bash
+personadock sync collect xiaoyou
+personadock sync candidates xiaoyou --status pending
+personadock sync review approve <item-id> --scope shared
+personadock sync plan xiaoyou
+personadock sync apply xiaoyou --yes
+```
+
+Session Summary：
+
+```bash
+personadock session collect xiaoyou
+personadock session list xiaoyou --status pending
+personadock session review approve <summary-id> --scope shared
+personadock session plan xiaoyou
+personadock session apply xiaoyou --yes
+```
+
+默认自动批准关闭；冲突阻止传播；来源回声关闭；原始 Session/Transcript 同步始终关闭。
+
+## Web 控制台
 
 ```bash
 personadock serve
 ```
 
-默认地址：
+页面：
 
 ```text
-http://127.0.0.1:8732
+http://127.0.0.1:8732/
+http://127.0.0.1:8732/canonical
+http://127.0.0.1:8732/hermes
+http://127.0.0.1:8732/openclaw
+http://127.0.0.1:8732/sync
+http://127.0.0.1:8732/sessions
 ```
 
-当前页面提供：
+Web 和 CLI 使用同一 Registry 与服务层，不维护两套部署或同步逻辑。
 
-- 服务健康状态。
-- 系统和 PersonaDock 版本。
-- Hermes/OpenClaw/Generic Adapter Doctor。
-- 已检测目标和路径来源。
-- Phase 0 安全规则。
+## 非本机监听
 
-API：
-
-```text
-GET  /api/health
-GET  /api/doctor
-POST /api/plans/deploy
-GET  /api/docs
-```
-
-### 远程监听
-
-绑定非本机地址必须设置令牌：
+绑定非 Loopback 地址必须配置 Bearer Token：
 
 ```bash
 personadock serve \
@@ -121,18 +182,21 @@ personadock serve \
   --token "replace-with-a-long-random-token"
 ```
 
-也可以使用环境变量：
+也可以使用：
 
 ```bash
 export PERSONADOCK_WEB_TOKEN="replace-with-a-long-random-token"
 personadock serve --host 0.0.0.0
 ```
 
-远程部署建议放在 HTTPS 反向代理后面。Phase 0 不提供完整远程用户系统。
+远程访问应放在 HTTPS 反向代理后。PersonaDock 1.0 不提供多用户身份系统或云端托管控制平面。
 
-## 当前限制
+## 相关文档
 
-- Hermes Profile Distribution Adapter 尚未启用。
-- OpenClaw Agent Workspace Adapter 尚未启用。
-- Persona Registry、Discovery、Adopt、Export 和 Sync 属于后续阶段。
-- 当前部署仍通过 Legacy Filesystem Adapter，但必须经过计划和可信目标解析。
+- [完整文档索引](README.md)
+- [Registry 与运行实例发现](registry-discovery.md)
+- [Hermes 原生 Adapter](hermes-native-adapter.md)
+- [OpenClaw 原生 Adapter](openclaw-native-adapter.md)
+- [受控 Memory 同步](governed-sync.md)
+- [Reviewed Session Summaries](session-summaries.md)
+- [迁移与回滚](migration-and-rollback.md)
