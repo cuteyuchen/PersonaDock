@@ -16,6 +16,7 @@ from .editor_api import register_editor_routes
 from .hermes_api import register_hermes_routes
 from .lifecycle_api import register_lifecycle_routes
 from .openclaw_api import register_openclaw_routes
+from .phase_assets import register_phase_asset_routes
 from .session_api import register_session_routes
 from .sync_api import register_sync_routes
 from .v1_api import register_v1_routes
@@ -68,6 +69,7 @@ def create_app(token: str | None = None):
             "stable_1_0_contract": True,
         }
 
+    register_phase_asset_routes(app)
     register_v1_routes(app, require_token, RegistryService)
     register_lifecycle_routes(app, require_token, RegistryService)
     register_editor_routes(app, require_token, RegistryService)
