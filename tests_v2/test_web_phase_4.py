@@ -104,7 +104,8 @@ def test_private_backup_and_character_card_workflows(tmp_path: Path) -> None:
     card_path = Path(exported["path"])
     assert card_path.is_file()
     card = service.inspect_character_card(card_path)
-    assert card["version"] == 3
+    assert card["spec"] == "chara_card_v3"
+    assert card["spec_version"] == "3.0"
     imported = service.import_character_card(
         card_path,
         tmp_path / "personas" / "xiaoyou-card",
