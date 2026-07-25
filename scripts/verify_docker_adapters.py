@@ -8,6 +8,7 @@ from pathlib import Path
 
 from persona_dock.adapters.hermes import HermesAdapter
 from persona_dock.adapters.openclaw import OpenClawAdapter
+from persona_dock import doctor as doctor_module
 
 
 def run(arguments: list[str], *, check: bool = True) -> subprocess.CompletedProcess[str]:
@@ -108,6 +109,38 @@ fi
                 raise AssertionError(openclaw_result.to_dict())
             if openclaw_result.details.get("transport") != "docker":
                 raise AssertionError("OpenClaw Doctor did not report Docker transport")
+
+            original_hermes = doctor_module.HermesAdapter
+            original_openclaw = doctor_module.OpenClawAdapter
+
+            class DockerOnlyHermes(original_hermes):
+                def doctor(self):
+                    if self.container:
+                        return super().doctor()
+                    return HermesAdapter(executable="personadock-missing-hermes").doctor()
+
+            class DockerOnlyOpenClaw(original_openclaw):
+                def doctor(self):
+                    if self.container:
+                        return super().doctor()
+                    return OpenClawAdapter(executable="personadock-missing-openclaw").doctor()
+
+            doctor_module.HermesAdapter = DockerOnlyHermes
+            doctor_module.OpenClawAdapter = DockerOnlyOpenClaw
+            try:
+                report = doctor_module.doctor_report()
+            finally:
+                doctor_module.HermesAdapter = original_hermes
+                doctor_module.OpenClawAdapter = original_openclaw
+            adapters = {item["adapter"]: item for item in report["adapters"]}
+            for adapter_name in ("hermes", "openclaw"):
+                result = adapters[adapter_name]
+                if not result["available"] or result["status"] != "ready":
+                    raise AssertionError(result)
+                if result["details"].get("container") != name:
+                    raise AssertionError(f"Top-level Doctor did not discover Docker {adapter_name}")
+                if result["details"].get("discovery_source") != "docker-auto":
+                    raise AssertionError(f"Top-level Doctor did not report Docker discovery for {adapter_name}")
 
             source = root / "source.txt"
             source.write_text("PersonaDock Docker round trip", encoding="utf-8")

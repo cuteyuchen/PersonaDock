@@ -77,6 +77,7 @@ Doctor 会显示：
 - PersonaDock、Python/独立程序和系统信息。
 - Hermes/OpenClaw 命令与版本是否可用。
 - Adapter 能力和 Transport。
+- 宿主机 CLI 不可用时，Docker 中唯一可用的 Hermes/OpenClaw 容器；多个候选会明确报告歧义。
 - 本机目标是否可信且唯一。
 - 需要显式参数或人工处理的冲突。
 

@@ -1,12 +1,15 @@
 from __future__ import annotations
 
 from pathlib import Path
+from types import SimpleNamespace
 
 import pytest
 
 from persona_dock.cli import build_parser
 from persona_dock.deployment.plans import build_deployment_plan
-from persona_dock.doctor import doctor_report
+from persona_dock import doctor as doctor_module
+from persona_dock.adapters.base import AdapterCapabilities, AdapterDoctorResult
+from persona_dock.doctor import doctor_report, render_doctor
 from persona_dock.packaging import pack_project
 from persona_dock.project import init_project
 from persona_dock.targeting import TargetResolutionError, detect_hermes_target
@@ -114,6 +117,193 @@ def test_doctor_and_web_use_shared_service(
     assert "/api/doctor" in paths
     assert "/api/plans/deploy" in paths
     assert "/" in paths
+
+
+def _doctor_result(
+    adapter: str,
+    *,
+    status: str,
+    container: str | None = None,
+) -> AdapterDoctorResult:
+    return AdapterDoctorResult(
+        adapter=adapter,
+        available=status == "ready",
+        executable=(f"docker exec {container} {adapter}" if container else adapter),
+        version="1.0.0" if status != "unavailable" else None,
+        status=status,
+        message=f"{adapter} {status}",
+        capabilities=AdapterCapabilities(docker=True),
+        details={
+            "native": True,
+            "transport": "docker" if container else "local",
+            "container": container,
+        },
+    )
+
+
+def test_doctor_auto_discovers_unique_docker_adapters(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    class FakeHermes:
+        def __init__(self, *, container: str | None = None, **_: object) -> None:
+            self.container = container
+
+        def doctor(self) -> AdapterDoctorResult:
+            return _doctor_result(
+                "hermes",
+                status="ready" if self.container else "unavailable",
+                container=self.container,
+            )
+
+    class FakeOpenClaw:
+        def __init__(self, *, container: str | None = None, **_: object) -> None:
+            self.container = container
+
+        def doctor(self) -> AdapterDoctorResult:
+            return _doctor_result(
+                "openclaw",
+                status="ready" if self.container else "unavailable",
+                container=self.container,
+            )
+
+    calls: list[tuple[str, tuple[str, ...]]] = []
+
+    def probe(
+        containers: list[dict[str, str]],
+        *,
+        cli: str,
+        arguments: list[str],
+        **_: object,
+    ) -> list[dict[str, str]]:
+        calls.append((cli, tuple(arguments)))
+        name = "hermes-box" if cli == "hermes" else "openclaw-box"
+        return [item for item in containers if item["name"] == name]
+
+    monkeypatch.setattr(doctor_module, "HermesAdapter", FakeHermes)
+    monkeypatch.setattr(doctor_module, "OpenClawAdapter", FakeOpenClaw)
+    monkeypatch.setattr(
+        doctor_module,
+        "_list_running_docker_containers",
+        lambda **_: (
+            [
+                {"name": "openclaw-box", "image": "openclaw:test"},
+                {"name": "hermes-box", "image": "hermes:test"},
+                {"name": "other", "image": "busybox"},
+            ],
+            {"status": "ok", "reason": "scanned", "message": "ok", "container_count": 3},
+        ),
+    )
+    monkeypatch.setattr(doctor_module, "_docker_executable", lambda: "docker")
+    monkeypatch.setattr(doctor_module, "_probe_containers_for_cli", probe)
+
+    report = doctor_report()
+    adapters = {item["adapter"]: item for item in report["adapters"]}
+    assert adapters["hermes"]["status"] == "ready"
+    assert adapters["hermes"]["details"]["container"] == "hermes-box"
+    assert adapters["hermes"]["details"]["discovery_source"] == "docker-auto"
+    assert adapters["openclaw"]["status"] == "ready"
+    assert adapters["openclaw"]["details"]["container"] == "openclaw-box"
+    assert calls == [("hermes", ("version",)), ("openclaw", ("--version",))]
+
+
+def test_doctor_reports_ambiguous_docker_containers(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    local = _doctor_result("hermes", status="unavailable")
+    ready = lambda container: _doctor_result("hermes", status="ready", container=container)
+    monkeypatch.setattr(
+        doctor_module,
+        "_probe_containers_for_cli",
+        lambda *_args, **_kwargs: [
+            {"name": "hermes-a", "image": "image-a", "version": "1.0.0"},
+            {"name": "hermes-b", "image": "image-b", "version": "1.0.0"},
+        ],
+    )
+
+    result = doctor_module._resolve_docker_adapter(
+        adapter_name="hermes",
+        local_result=local,
+        containers=[{"name": "ignored", "image": "ignored"}],
+        docker_scan={"status": "ok", "reason": "scanned", "message": "ok", "container_count": 2},
+        docker_executable="docker",
+        cli="hermes",
+        arguments=["version"],
+        factory=lambda name: SimpleNamespace(doctor=lambda: ready(name)),
+    )
+    assert result.status == "ambiguous"
+    assert result.available is False
+    assert [item["container"] for item in result.details["candidates"]] == ["hermes-a", "hermes-b"]
+    assert "--container <name>" in render_doctor(
+        {"personadock_version": "1.0.0", "platform": "test", "machine": "test", "python_version": "test", "adapters": [result.to_dict()]}
+    )
+
+
+@pytest.mark.parametrize("status", ["ready", "degraded"])
+def test_doctor_does_not_fallback_when_local_adapter_is_not_unavailable(
+    monkeypatch: pytest.MonkeyPatch,
+    status: str,
+) -> None:
+    local = _doctor_result("openclaw", status=status)
+    monkeypatch.setattr(
+        doctor_module,
+        "_probe_containers_for_cli",
+        lambda *_args, **_kwargs: pytest.fail("Docker probe must not run for a degraded local adapter"),
+    )
+
+    result = doctor_module._resolve_docker_adapter(
+        adapter_name="openclaw",
+        local_result=local,
+        containers=[{"name": "openclaw", "image": "openclaw:test"}],
+        docker_scan={"status": "ok"},
+        docker_executable="docker",
+        cli="openclaw",
+        arguments=["--version"],
+        factory=lambda _: pytest.fail("Docker adapter must not be instantiated"),
+    )
+    assert result.status == status
+    assert result.details["discovery_source"] == "local"
+
+
+def test_docker_container_listing_handles_daemon_errors(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(
+        doctor_module,
+        "_run_command",
+        lambda *_args, **_kwargs: SimpleNamespace(returncode=1, stdout="", stderr="permission denied"),
+    )
+    containers, scan = doctor_module._list_running_docker_containers(
+        docker_executable="docker"
+    )
+    assert containers == []
+    assert scan["reason"] == "docker-daemon-unavailable"
+    assert scan["message"] == "permission denied"
+
+
+def test_docker_container_listing_handles_missing_cli(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(doctor_module, "_docker_executable", lambda: None)
+    containers, scan = doctor_module._list_running_docker_containers()
+    assert containers == []
+    assert scan["reason"] == "docker-cli-missing"
+
+
+def test_docker_probe_timeout_is_not_a_candidate(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    def docker_timeout(*_args: object, **_kwargs: object) -> None:
+        raise doctor_module.subprocess.TimeoutExpired(["docker"], 5)
+
+    monkeypatch.setattr(doctor_module, "_run_command", docker_timeout)
+    result = doctor_module._probe_container_cli(
+        docker_executable="docker",
+        container="stopped-during-check",
+        cli="hermes",
+        arguments=["version"],
+    )
+    assert result["present"] is False
+    assert "timed out" in result["error"]
 
 
 def test_cli_exposes_phase_zero_commands() -> None:

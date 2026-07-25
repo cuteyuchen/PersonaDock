@@ -215,8 +215,16 @@ class HermesAdapter(PersonaAdapter):
         )
 
     def doctor(self) -> AdapterDoctorResult:
-        executable = self.runner.executable if not self.container else "docker exec hermes"
-        details = {"container": self.container, "native": True}
+        executable = (
+            self.runner.executable
+            if not self.container
+            else f"docker exec {self.container} hermes"
+        )
+        details = {
+            "container": self.container,
+            "native": True,
+            "transport": "docker" if self.container else "local",
+        }
         try:
             version_result = self.runner.run(["version"], timeout=15)
         except HermesAdapterError as error:
@@ -245,7 +253,19 @@ class HermesAdapter(PersonaAdapter):
                 capabilities=self.capabilities,
                 details=details,
             )
-        profiles = self.runner.run(["profile", "list"], timeout=20)
+        try:
+            profiles = self.runner.run(["profile", "list"], timeout=20)
+        except HermesAdapterError as error:
+            return AdapterDoctorResult(
+                adapter=self.name,
+                available=False,
+                executable=executable,
+                version=version,
+                status="degraded",
+                message=str(error),
+                capabilities=self.capabilities,
+                details=details,
+            )
         if not profiles.ok:
             return AdapterDoctorResult(
                 adapter=self.name,

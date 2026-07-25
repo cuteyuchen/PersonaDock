@@ -370,7 +370,7 @@ class OpenClawAdapter(PersonaAdapter):
     def doctor(self) -> AdapterDoctorResult:
         executable = self.runner.executable
         if self.container:
-            executable = "docker exec openclaw"
+            executable = f"docker exec {self.container} openclaw"
         elif self.ssh_host:
             executable = f"ssh {self.ssh_host} openclaw"
         details = {
@@ -405,7 +405,19 @@ class OpenClawAdapter(PersonaAdapter):
                 capabilities=self.capabilities,
                 details=details,
             )
-        agents_result = self.runner.run(["agents", "list", "--json"], timeout=30)
+        try:
+            agents_result = self.runner.run(["agents", "list", "--json"], timeout=30)
+        except OpenClawAdapterError as error:
+            return AdapterDoctorResult(
+                adapter=self.name,
+                available=False,
+                executable=executable,
+                version=version,
+                status="degraded",
+                message=str(error),
+                capabilities=self.capabilities,
+                details=details,
+            )
         if not agents_result.ok:
             return AdapterDoctorResult(
                 adapter=self.name,

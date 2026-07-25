@@ -13,9 +13,15 @@ Docker：
 
 ```bash
 docker version
+personadock doctor --json
 personadock hermes doctor --container hermes-agent
 personadock openclaw doctor --container openclaw
 ```
+
+顶层 `personadock doctor` 会先检查宿主机 CLI；某个 Adapter 在宿主机不可用时，
+会只读扫描运行中的 Docker 容器并自动检查 Hermes/OpenClaw CLI。发现唯一容器时会
+报告其名称和 `docker` transport；发现多个候选时会报告 `ambiguous`，但不会自动选择
+部署目标。
 
 SSH OpenClaw：
 
