@@ -1,0 +1,149 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>PersonaDock 会话摘要</title>
+  <style>
+    :root { font-family: Inter, system-ui, sans-serif; color-scheme: light dark; }
+    body { max-width: 1180px; margin: 0 auto; padding: 28px; line-height: 1.55; }
+    header, .row { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; }
+    nav a { margin-right: 14px; }
+    section { border: 1px solid #7776; border-radius: 12px; padding: 18px; margin: 18px 0; }
+    input, select, button, textarea { font: inherit; padding: 8px 10px; }
+    input, select { min-width: 220px; }
+    button { cursor: pointer; }
+    .card { border-top: 1px solid #7775; padding: 14px 0; }
+    .meta { opacity: .72; font-size: .9rem; }
+    .badge { border: 1px solid #7777; border-radius: 999px; padding: 2px 8px; }
+    pre { white-space: pre-wrap; overflow-wrap: anywhere; background: #7771; padding: 12px; border-radius: 8px; }
+    .warning { border-left: 4px solid #c67a00; padding-left: 12px; }
+  </style>
+</head>
+<body>
+<header>
+  <div>
+    <h1>会话摘要与交接</h1>
+    <nav><a href="/">总览</a><a href="/sync">同步中心</a><a href="/hermes">Hermes</a><a href="/openclaw">OpenClaw</a></nav>
+  </div>
+</header>
+<p class="warning">原始 Session 不会保存或同步。仅保留脱敏后的摘要、来源哈希、决策和待办；系统消息与工具消息始终排除。</p>
+
+<section>
+  <h2>选择人格</h2>
+  <div class="row">
+    <select id="persona"></select>
+    <button onclick="loadDashboard()">刷新</button>
+  </div>
+  <pre id="policy">尚未加载</pre>
+</section>
+
+<section>
+  <h2>从绑定实例读取</h2>
+  <div class="row">
+    <select id="instance"></select>
+    <input id="sessionIdentifier" placeholder="Hermes Session ID / OpenClaw Session Key">
+    <button onclick="collectNative()">只读导出并生成候选</button>
+  </div>
+</section>
+
+<section>
+  <h2>预览或导入本地导出文件</h2>
+  <div class="row">
+    <input id="filePath" placeholder="本机 JSON/JSONL 绝对路径">
+    <input id="fileSessionId" placeholder="可选 Session ID">
+    <button onclick="previewFile()">只预览</button>
+    <button onclick="importFile()">加入审核队列</button>
+  </div>
+  <pre id="preview">尚未预览</pre>
+</section>
+
+<section>
+  <h2>摘要审核队列</h2>
+  <div class="row">
+    <select id="status" onchange="loadDashboard()">
+      <option value="">全部</option>
+      <option value="pending">待审核</option>
+      <option value="approved">已批准</option>
+      <option value="rejected">已拒绝</option>
+    </select>
+  </div>
+  <div id="summaries"></div>
+</section>
+
+<script>
+const api = async (path, options={}) => {
+  const response = await fetch(path, {headers:{'Content-Type':'application/json'}, ...options});
+  const data = await response.json().catch(() => ({}));
+  if (!response.ok) throw new Error(data.detail || response.statusText);
+  return data;
+};
+const esc = value => String(value ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+
+async function init() {
+  const personas = await api('/api/personas');
+  persona.innerHTML = personas.map(p => `<option value="${esc(p.id)}">${esc(p.name)} (${esc(p.id)})</option>`).join('');
+  const instances = await api('/api/instances');
+  instance.innerHTML = instances.map(i => `<option value="${esc(i.id)}">${esc(i.adapter)} / ${esc(i.display_name)} / ${esc(i.transport)}</option>`).join('');
+  await loadDashboard();
+}
+
+async function loadDashboard() {
+  if (!persona.value) return;
+  const data = await api(`/api/sessions/${encodeURIComponent(persona.value)}`);
+  policy.textContent = JSON.stringify({policy:data.policy, counts:data.counts, raw_sessions_persisted:data.raw_sessions_persisted}, null, 2);
+  const wanted = status.value;
+  const rows = data.summaries.filter(item => !wanted || item.status === wanted);
+  summaries.innerHTML = rows.length ? rows.map(renderSummary).join('') : '<p>没有会话摘要。</p>';
+}
+
+function renderSummary(item) {
+  const tasks = (item.pending_tasks || []).map(v => `<li>${esc(v)}</li>`).join('');
+  const decisions = (item.decisions || []).map(v => `<li>${esc(v)}</li>`).join('');
+  const actions = item.status === 'pending' ? `
+    <button onclick="review('${item.id}','approve','shared')">批准并共享</button>
+    <button onclick="review('${item.id}','approve','local-only')">仅本地保留</button>
+    <button onclick="review('${item.id}','reject')">拒绝</button>` : '';
+  return `<article class="card">
+    <div class="row"><strong>${esc(item.source_title || item.source_session_id)}</strong><span class="badge">${esc(item.status)}</span><span class="badge">${esc(item.sensitivity)}</span></div>
+    <p class="meta">${esc(item.source_adapter)} · ${esc(item.source_session_id)} · ${item.message_count} 条用户/助手消息</p>
+    <pre>${esc(item.summary)}</pre>
+    ${decisions ? `<h4>决策</h4><ul>${decisions}</ul>` : ''}
+    ${tasks ? `<h4>待办</h4><ul>${tasks}</ul>` : ''}
+    <div class="row">${actions}</div>
+  </article>`;
+}
+
+async function collectNative() {
+  try {
+    await api(`/api/sessions/${encodeURIComponent(persona.value)}/collect`, {method:'POST', body:JSON.stringify({runtime_instance_id:instance.value, session_identifier:sessionIdentifier.value})});
+    await loadDashboard();
+  } catch (error) { alert(error.message); }
+}
+
+async function previewFile() {
+  try {
+    const value = await api('/api/sessions/preview', {method:'POST', body:JSON.stringify({path:filePath.value, session_id:fileSessionId.value || null})});
+    preview.textContent = JSON.stringify(value, null, 2);
+  } catch (error) { alert(error.message); }
+}
+
+async function importFile() {
+  try {
+    await api(`/api/sessions/${encodeURIComponent(persona.value)}/import`, {method:'POST', body:JSON.stringify({path:filePath.value, source_adapter:'file', session_id:fileSessionId.value || null})});
+    await loadDashboard();
+  } catch (error) { alert(error.message); }
+}
+
+async function review(id, decision, scope='shared') {
+  try {
+    const path = `/api/sessions/summaries/${id}/${decision}`;
+    await api(path, {method:'POST', body:JSON.stringify({reviewer:'web', scope, reason: decision === 'reject' ? 'rejected in Web review center' : null})});
+    await loadDashboard();
+  } catch (error) { alert(error.message); }
+}
+
+init().catch(error => { document.body.insertAdjacentHTML('beforeend', `<pre>${esc(error.message)}</pre>`); });
+</script>
+</body>
+</html>
