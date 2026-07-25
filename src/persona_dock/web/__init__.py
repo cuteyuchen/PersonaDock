@@ -21,6 +21,7 @@ from .session_api import register_session_routes
 from .sync_api import register_sync_routes
 from .v1_api import register_v1_routes
 from .v3_api import register_v3_routes
+from .version import WEB_CONTROL_PLANE_VERSION, WEB_REFACTOR_PHASE
 
 
 def create_app(token: str | None = None):
@@ -49,8 +50,8 @@ def create_app(token: str | None = None):
             "status": "ok",
             "version": __version__,
             "phase": 8,
-            "web_control_plane": 2,
-            "web_refactor_phase": 3,
+            "web_control_plane": WEB_CONTROL_PLANE_VERSION,
+            "web_refactor_phase": WEB_REFACTOR_PHASE,
             "control_plane": "local",
             "registry": RegistryService().summary(),
             "canonical_schema": 3,
@@ -110,7 +111,7 @@ def run_server(
     if open_browser:
         threading.Timer(0.8, lambda: webbrowser.open(url)).start()
 
-    print(f"PersonaDock Web 2.0 control plane: {url}")
+    print(f"PersonaDock Web {WEB_CONTROL_PLANE_VERSION}.0 control plane: {url}")
     print(f"Canonical Persona editor: {url}/canonical")
     print(f"Hermes native Profile manager: {url}/hermes")
     print(f"OpenClaw native Agent manager: {url}/openclaw")
