@@ -7,12 +7,10 @@ from pathlib import Path
 from typing import Any
 
 from persona_dock import cli as legacy_cli
+from persona_dock.application import PersonaApplicationService
 from persona_dock.core.diff import diff_personas
 from persona_dock.core.migration import migrate_project_to_v3
 from persona_dock.core.testing import run_persona_tests
-from persona_dock.io import load_yaml
-from persona_dock.project import PROJECT_FILE, init_project
-from persona_dock.registry import RegistryService
 
 
 def _subparsers(parser: argparse.ArgumentParser) -> argparse._SubParsersAction:
@@ -46,29 +44,15 @@ def build_parser() -> argparse.ArgumentParser:
     return parser
 
 
-def _register_v3(project: Path) -> None:
-    value = load_yaml(project / PROJECT_FILE)
-    RegistryService().register_persona(
-        persona_id=str(value["id"]),
-        name=str(value["name"]),
-        version=str(value["version"]),
-        source_path=project,
-        schema_version=3,
-        summary=str(value["summary"]),
-    )
-
-
 def _run_init(args: argparse.Namespace) -> int:
-    result = init_project(
+    result = PersonaApplicationService().create(
         Path(args.destination),
-        args.id,
-        args.name,
-        args.locale,
-        args.force,
-        schema_version=3,
+        persona_id=args.id,
+        name=args.name,
+        locale=args.locale,
+        force=args.force,
     )
-    _register_v3(result)
-    print(result)
+    print(result["project"])
     return 0
 
 
@@ -80,7 +64,7 @@ def _run_migrate(args: argparse.Namespace) -> int:
         backup=not args.no_backup,
     )
     if result.changed:
-        _register_v3(Path(result.project))
+        PersonaApplicationService().register(Path(result.project))
     value = result.to_dict()
     if args.json:
         print(json.dumps(value, ensure_ascii=False, indent=2))
