@@ -22,9 +22,9 @@ PR #24 `phase-7/session-summaries` 未合并。它从 Phase 6 基线重新实现
 
 ### 已删除的历史实现
 
-- `CompanionVault` 包、Schema、旧安装器和文档已在 PR #6 删除。
+- PersonaDock 更名前的旧项目包、Schema、安装器和文档已在 PR #6 删除。
 - 独立 `persona-distiller` Skill 已在 PR #8/#11 删除。
-- 当前仓库中的相关字符串只用于 CI/CODEOWNERS 防回归检查，不是运行时代码。
+- CI 中只保留防止旧实现重新进入仓库的审计规则，不是运行时代码。
 
 ### 保留的兼容代码
 
