@@ -40,6 +40,19 @@ DEFAULT_SYNC_POLICY: dict[str, Any] = {
         "push": "manual",
         "pull": "snapshot-review",
     },
+    "session_summaries": {
+        "mode": "review",
+        "source_adapters": ["hermes", "openclaw"],
+        "auto_approve": False,
+        "max_sensitivity": "internal",
+        "max_turns": 20,
+        "include_pending_tasks": True,
+        "include_decisions": True,
+        "include_emotional_context": False,
+        "raw_session_import": "preview-only",
+        "include_system_messages": False,
+        "include_tool_messages": False,
+    },
 }
 
 
@@ -162,6 +175,37 @@ def validate_policy(config: dict[str, Any]) -> dict[str, Any]:
         raise ValueError("definition_sync.push must be manual or disabled")
     if definition.get("pull") not in {"snapshot-review", "disabled"}:
         raise ValueError("definition_sync.pull must be snapshot-review or disabled")
+
+    sessions = value.get("session_summaries")
+    if not isinstance(sessions, dict):
+        raise ValueError("session_summaries must be an object")
+    if sessions.get("mode") not in {"review", "automatic", "disabled"}:
+        raise ValueError("session_summaries.mode must be review, automatic, or disabled")
+    adapters = sessions.get("source_adapters", [])
+    if not isinstance(adapters, list) or any(
+        adapter not in {"hermes", "openclaw", "file"} for adapter in adapters
+    ):
+        raise ValueError("session_summaries.source_adapters contains an unsupported adapter")
+    if not isinstance(sessions.get("auto_approve"), bool):
+        raise ValueError("session_summaries.auto_approve must be boolean")
+    if sessions.get("max_sensitivity") not in SENSITIVITY_RANK:
+        raise ValueError("session_summaries.max_sensitivity is invalid")
+    max_turns = sessions.get("max_turns")
+    if not isinstance(max_turns, int) or not 2 <= max_turns <= 200:
+        raise ValueError("session_summaries.max_turns must be between 2 and 200")
+    for key in (
+        "include_pending_tasks",
+        "include_decisions",
+        "include_emotional_context",
+        "include_system_messages",
+        "include_tool_messages",
+    ):
+        if not isinstance(sessions.get(key), bool):
+            raise ValueError(f"session_summaries.{key} must be boolean")
+    if sessions.get("include_system_messages") or sessions.get("include_tool_messages"):
+        raise ValueError("system and tool messages cannot be synchronized in Phase 7")
+    if sessions.get("raw_session_import") not in {"disabled", "preview-only"}:
+        raise ValueError("session_summaries.raw_session_import must be disabled or preview-only")
     return value
 
 
