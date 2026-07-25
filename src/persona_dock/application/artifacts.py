@@ -3,7 +3,6 @@ from __future__ import annotations
 import base64
 import json
 import re
-import shutil
 import zipfile
 from dataclasses import dataclass
 from pathlib import Path
@@ -16,11 +15,7 @@ from persona_dock.character_card import (
     load_character_card,
 )
 from persona_dock.compiler import compile_project
-from persona_dock.package_trust import (
-    generate_signing_key,
-    sign_package,
-    verify_package,
-)
+from persona_dock.package_trust import generate_signing_key, sign_package, verify_package
 from persona_dock.packaging import export_public, inspect_package, pack_project
 from persona_dock.private_backup import (
     create_private_backup,
@@ -49,6 +44,9 @@ class ArtifactRoots:
     backups: Path
     keys: Path
 
+    def values(self) -> tuple[Path, ...]:
+        return (self.uploads, self.exports, self.backups, self.keys)
+
     def to_dict(self) -> dict[str, str]:
         return {
             "uploads": str(self.uploads),
@@ -62,18 +60,14 @@ class ArtifactStore:
     MAX_UPLOAD_BYTES = 16 * 1024 * 1024
 
     def __init__(self, root: str | Path | None = None) -> None:
-        base = (
-            Path(root).expanduser().resolve()
-            if root is not None
-            else registry_root().resolve()
-        )
+        base = Path(root).expanduser().resolve() if root is not None else registry_root().resolve()
         self.roots = ArtifactRoots(
             uploads=(base / "uploads").resolve(),
             exports=(base / "exports").resolve(),
             backups=(base / "backups").resolve(),
             keys=(base / "keys").resolve(),
         )
-        for path in self.roots.__dict__.values():
+        for path in self.roots.values():
             path.mkdir(parents=True, exist_ok=True)
 
     @staticmethod
@@ -83,10 +77,9 @@ class ArtifactStore:
         return name[:180] or fallback
 
     def root(self, category: str) -> Path:
-        try:
-            return getattr(self.roots, category)
-        except AttributeError as error:
-            raise ArtifactPathError(f"unsupported artifact category: {category}") from error
+        if category not in {"uploads", "exports", "backups", "keys"}:
+            raise ArtifactPathError(f"unsupported artifact category: {category}")
+        return getattr(self.roots, category)
 
     def output(self, category: str, filename: str) -> Path:
         root = self.root(category)
@@ -186,16 +179,13 @@ class ArtifactApplicationService:
 
     @staticmethod
     def _manifest(build: Path) -> dict[str, Any]:
-        path = build / "manifest.json"
-        return json.loads(path.read_text(encoding="utf-8"))
+        return json.loads((build / "manifest.json").read_text(encoding="utf-8"))
 
     def build(self, persona_id: str, *, targets: list[str] | None = None) -> dict[str, Any]:
         root = self.persona_root(persona_id)
         build = compile_project(root, targets=targets)
         manifest = self._manifest(build)
-        archive = self.store.output(
-            "exports", f"{manifest['id']}-{manifest['version']}-build.zip"
-        )
+        archive = self.store.output("exports", f"{manifest['id']}-{manifest['version']}-build.zip")
         _zip_directory(build, archive)
         return {
             "persona_id": persona_id,
@@ -213,9 +203,7 @@ class ArtifactApplicationService:
         root = self.persona_root(persona_id)
         record = self.registry.get_persona(persona_id)
         assert record is not None
-        destination = self.store.output(
-            "exports", f"{persona_id}-{record.version}.personapack"
-        )
+        destination = self.store.output("exports", f"{persona_id}-{record.version}.personapack")
         package = pack_project(root, destination=destination, targets=targets)
         return {"path": str(package), "manifest": inspect_package(package)}
 
@@ -225,9 +213,7 @@ class ArtifactApplicationService:
         assert record is not None
         directory = self.store.roots.exports / f"{persona_id}-{record.version}-public"
         output = export_public(root, destination=directory)
-        archive = self.store.output(
-            "exports", f"{persona_id}-{record.version}-public.zip"
-        )
+        archive = self.store.output("exports", f"{persona_id}-{record.version}-public.zip")
         _zip_directory(output, archive)
         return {
             "directory": str(output),
@@ -239,8 +225,8 @@ class ArtifactApplicationService:
         resolved = self.store.resolve(path, categories=("uploads", "exports"))
         return inspect_package(resolved)
 
-    def list_keys(self) -> list[dict[str, str]]:
-        values: list[dict[str, str]] = []
+    def list_keys(self) -> list[dict[str, Any]]:
+        values: list[dict[str, Any]] = []
         for public_path in sorted(self.store.roots.keys.glob("*.pub")):
             try:
                 payload = json.loads(public_path.read_text(encoding="utf-8"))
@@ -254,7 +240,7 @@ class ArtifactApplicationService:
                     "name": private_path.name,
                     "key_id": str(payload["key_id"]),
                     "public_key": str(public_path),
-                    "private_key_available": str(private_path.is_file()).lower(),
+                    "private_key_available": private_path.is_file(),
                 }
             )
         return values
@@ -274,8 +260,7 @@ class ArtifactApplicationService:
     def _private_key(self, key_id: str) -> Path:
         for item in self.list_keys():
             if item["key_id"] == key_id:
-                public = Path(item["public_key"])
-                private = public.with_suffix("")
+                private = Path(item["public_key"]).with_suffix("")
                 if not private.is_file():
                     raise FileNotFoundError(private)
                 return private
@@ -283,9 +268,8 @@ class ArtifactApplicationService:
 
     def sign(self, package_path: str | Path, *, key_id: str) -> dict[str, Any]:
         package = self.store.resolve(package_path, categories=("uploads", "exports"))
-        private = self._private_key(key_id)
         signature = self.store.output("exports", package.name + ".sig.json")
-        result = sign_package(package, private, signature_path=signature)
+        result = sign_package(package, self._private_key(key_id), signature_path=signature)
         return {"signature": str(result), "key_id": key_id}
 
     def verify(
@@ -301,7 +285,7 @@ class ArtifactApplicationService:
             if signature_path
             else None
         )
-        trusted = [item["key_id"] for item in self.list_keys()] if trust_local_keys else []
+        trusted = [str(item["key_id"]) for item in self.list_keys()] if trust_local_keys else []
         return verify_package(
             package,
             signature_path=signature,
@@ -312,9 +296,7 @@ class ArtifactApplicationService:
         root = self.persona_root(persona_id)
         record = self.registry.get_persona(persona_id)
         assert record is not None
-        destination = self.store.output(
-            "backups", f"{persona_id}-{record.version}.pdbackup"
-        )
+        destination = self.store.output("backups", f"{persona_id}-{record.version}.pdbackup")
         return create_private_backup(root, destination, password=password).to_dict()
 
     def inspect_backup(self, path: str | Path) -> dict[str, Any]:
@@ -329,12 +311,7 @@ class ArtifactApplicationService:
         password: str,
     ) -> dict[str, Any]:
         backup = self.store.resolve(path, categories=("uploads", "backups"))
-        restored = restore_private_backup(
-            backup,
-            destination,
-            password=password,
-            force=False,
-        )
+        restored = restore_private_backup(backup, destination, password=password, force=False)
         registered = PersonaApplicationService(self.registry).register(restored)
         return {"restored": str(restored), "persona": registered["persona"]}
 
@@ -370,15 +347,8 @@ class ArtifactApplicationService:
     ) -> dict[str, Any]:
         root = self.persona_root(persona_id)
         suffix = ".charx" if charx else ".json"
-        destination = self.store.output(
-            "exports", f"{persona_id}-character-card-v{version}{suffix}"
-        )
-        result = export_character_card(
-            root,
-            destination,
-            version=version,
-            charx=charx,
-        )
+        destination = self.store.output("exports", f"{persona_id}-character-card-v{version}{suffix}")
+        result = export_character_card(root, destination, version=version, charx=charx)
         return {"path": str(result), "card": load_character_card(result).info().to_dict()}
 
     def adapter_summary(self) -> dict[str, Any]:
