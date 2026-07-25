@@ -3,37 +3,56 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>PersonaDock</title>
-  <meta name="description" content="从自然语言或聊天记录创建、打包并安装可移植 AI 人格">
+  <title>PersonaDock 1.0</title>
+  <meta name="description" content="本地优先、跨 Agent 的 AI 人格控制平面">
   <style>
     :root { color-scheme: light dark; font-family: Inter, system-ui, sans-serif; }
-    body { max-width: 880px; margin: 0 auto; padding: 64px 24px; line-height: 1.7; }
+    body { max-width: 980px; margin: 0 auto; padding: 64px 24px; line-height: 1.7; }
     h1 { font-size: clamp(3rem, 10vw, 6rem); margin: 0; letter-spacing: -0.06em; }
     h2 { margin-top: 3rem; }
-    .lead { font-size: 1.25rem; max-width: 720px; }
+    .lead { font-size: 1.25rem; max-width: 780px; }
     pre { overflow: auto; padding: 18px; border: 1px solid #8885; border-radius: 12px; }
-    .grid { display: grid; grid-template-columns: repeat(auto-fit,minmax(210px,1fr)); gap: 16px; }
+    .grid { display: grid; grid-template-columns: repeat(auto-fit,minmax(220px,1fr)); gap: 16px; }
     .card { border: 1px solid #8885; border-radius: 14px; padding: 18px; }
     a { color: inherit; }
+    .muted { opacity: .75; }
   </style>
 </head>
 <body>
   <h1>PersonaDock</h1>
-  <p class="lead">无需安装 Python。通过系统安装脚本获取独立程序，再把统一的 persona-builder Skill 安装到 Codex、Claude 或 OpenCode。直接描述人格、选择聊天记录，或将两者结合，Skill 会自动判断创建、蒸馏、混合或优化模式。</p>
-  <h2>Linux / macOS</h2>
+  <p class="lead">本地优先、跨 Agent 的 AI 人格控制平面。创建或接管 Canonical Persona，通过原生 Adapter 安全部署到 Hermes 与 OpenClaw，并治理共享 Memory、Session Summary、快照、回滚和信任。</p>
+
+  <h2>安装</h2>
+  <h3>Linux / macOS</h3>
   <pre><code>curl -fsSL https://raw.githubusercontent.com/cuteyuchen/PersonaDock/main/install.sh | sh
-personadock skill install --target codex --scope global</code></pre>
-  <h2>Windows PowerShell</h2>
+personadock --version
+personadock doctor --json</code></pre>
+
+  <h3>Windows PowerShell</h3>
   <pre><code>irm https://raw.githubusercontent.com/cuteyuchen/PersonaDock/main/install.ps1 | iex
-personadock skill install --target codex --scope global</code></pre>
+personadock --version
+personadock doctor --json</code></pre>
+
   <div class="grid">
-    <div class="card"><strong>No Python required</strong><br>Release 提供 Linux、Windows 与 macOS 独立程序。</div>
-    <div class="card"><strong>One Skill</strong><br>自动选择创建、蒸馏、混合或优化流程。</div>
-    <div class="card"><strong>Evidence-aware</strong><br>聊天蒸馏保留来源、置信度和审核过程。</div>
-    <div class="card"><strong>Portable</strong><br>使用可校验的 .personapack 跨智能体安装。</div>
+    <div class="card"><strong>Canonical Persona v3</strong><br>结构化人格、来源、置信度、行为规则和确定性场景测试。</div>
+    <div class="card"><strong>Native Adapters</strong><br>Hermes Profile 与 OpenClaw Agent/Workspace，本机、Docker 和 SSH。</div>
+    <div class="card"><strong>Governed Sync</strong><br>Memory 与 Session Summary 默认审核，支持冲突、来源和循环抑制。</div>
+    <div class="card"><strong>Safe Lifecycle</strong><br>Plan、Snapshot、Apply、Verify、Rollback 和 Journal。</div>
+    <div class="card"><strong>Trust & Backup</strong><br>PersonaPack Ed25519 签名与 AES-256-GCM 私有备份。</div>
+    <div class="card"><strong>Portable</strong><br>五平台独立程序、Character Card 和稳定 Adapter API 1.0。</div>
   </div>
-  <h2>私有、本地、可选择公开</h2>
-  <p>PersonaDock 不要求 Fork、PR 或上传人格。原始聊天、设计笔记和未审核记忆默认留在本地；公共导出只是用户主动选择的可选能力。</p>
-  <p><a href="https://github.com/cuteyuchen/PersonaDock">GitHub</a></p>
+
+  <h2>快速开始</h2>
+  <pre><code>personadock skill install --target codex --scope global
+personadock init ./xiaoyou --id xiaoyou --name 小柚
+personadock validate ./xiaoyou
+personadock test ./xiaoyou
+personadock pack ./xiaoyou --output ./xiaoyou.personapack</code></pre>
+
+  <h2>安全边界</h2>
+  <p>PersonaDock 不要求 Fork、PR 或上传人格。原始聊天、设计笔记和未审核候选默认留在本地；认证、原始 Session、Transcript 和运行时 State 不进入 PersonaPack，也不会跨运行时同步。</p>
+  <p class="muted">Hermes 与 OpenClaw 默认使用平台原生 CLI。旧文件系统直写仅作为显式迁移兼容模式保留。</p>
+
+  <p><a href="https://github.com/cuteyuchen/PersonaDock">GitHub 与完整文档</a></p>
 </body>
 </html>
