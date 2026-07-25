@@ -8,6 +8,8 @@ from fastapi.responses import Response
 _ASSETS = {
     "editor.css": "text/css; charset=utf-8",
     "editor.js": "text/javascript; charset=utf-8",
+    "artifacts.css": "text/css; charset=utf-8",
+    "artifacts.js": "text/javascript; charset=utf-8",
 }
 
 
