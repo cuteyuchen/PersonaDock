@@ -2,6 +2,8 @@ from __future__ import annotations
 
 import json
 import re
+import shlex
+import subprocess
 import uuid
 from dataclasses import asdict, dataclass
 from pathlib import Path
@@ -69,7 +71,20 @@ def export_hermes_session(
         try:
             adapter.runner.docker_copy_from(remote, local)
         finally:
-            adapter.runner.run(["shell", "rm", "-f", remote], timeout=15)
+            subprocess.run(
+                [
+                    adapter.runner.docker_executable,
+                    "exec",
+                    container,
+                    "sh",
+                    "-lc",
+                    f"rm -f {shlex.quote(remote)}",
+                ],
+                check=False,
+                capture_output=True,
+                text=True,
+                timeout=20,
+            )
     else:
         result = adapter.runner.run(
             ["sessions", "export", str(local), "--session-id", session_id],
@@ -136,7 +151,7 @@ def export_openclaw_session(
         try:
             adapter.runner.copy_from(remote, local_root)
         finally:
-            adapter.runner.shell(f"rm -rf {remote!r}", timeout=20)
+            adapter.runner.shell(f"rm -rf {shlex.quote(remote)}", timeout=20)
     if not local_root.exists() and result.stdout.strip():
         try:
             json.loads(result.stdout)
