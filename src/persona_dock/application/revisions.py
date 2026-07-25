@@ -17,7 +17,7 @@ from persona_dock.registry.database import registry_root
 
 
 def utc_now() -> str:
-    return datetime.now(timezone.utc).isoformat(timespec="seconds").replace("+00:00", "Z")
+    return datetime.now(timezone.utc).isoformat(timespec="microseconds").replace("+00:00", "Z")
 
 
 def _canonical_bytes(model: dict[str, Any]) -> bytes:
