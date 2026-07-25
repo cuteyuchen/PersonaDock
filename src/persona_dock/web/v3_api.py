@@ -1,7 +1,5 @@
 from __future__ import annotations
 
-import json
-import shutil
 from datetime import datetime, timezone
 from importlib.resources import files
 from pathlib import Path
@@ -11,6 +9,7 @@ from fastapi import Depends, FastAPI, HTTPException
 from fastapi.responses import HTMLResponse
 from pydantic import BaseModel
 
+from persona_dock.application import RevisionStore, canonical_hash
 from persona_dock.core.diff import diff_personas
 from persona_dock.core.migration import migrate_project_to_v3
 from persona_dock.core.models import load_canonical_persona, normalize_canonical_persona
@@ -58,6 +57,18 @@ def _register(service: RegistryService, root: Path, value: dict[str, Any]) -> No
     )
 
 
+def _capture_baseline(store: RevisionStore, persona_id: str, model: dict[str, Any]) -> None:
+    latest = store.latest(persona_id)
+    if latest is None or latest.content_hash != canonical_hash(model):
+        store.capture(
+            persona_id,
+            model,
+            source="baseline",
+            summary="兼容编辑器保存前快照",
+            validation_result={"ok": True, "errors": []},
+        )
+
+
 def register_v3_routes(
     app: FastAPI,
     require_token: Callable[..., None],
@@ -88,12 +99,15 @@ def register_v3_routes(
         service = registry_factory()
         root = _source(service, persona_id)
         try:
+            before = load_canonical_persona(root)
             value = normalize_canonical_persona(request.model)
         except ValueError as error:
             raise HTTPException(status_code=400, detail=str(error)) from error
         if value.get("id") != persona_id:
             raise HTTPException(status_code=400, detail="Persona ID cannot be changed in this editor")
 
+        store = RevisionStore()
+        _capture_baseline(store, persona_id, before)
         project_file = root / PROJECT_FILE
         original = project_file.read_bytes()
         backup = root / ".personadock" / "editor-backups" / (
@@ -109,13 +123,32 @@ def register_v3_routes(
                 status_code=422,
                 detail={"message": "Canonical Persona validation failed", "errors": errors},
             )
+        tests = run_persona_tests(root).to_dict()
+        revision = store.capture(
+            persona_id,
+            value,
+            source="compatibility-editor",
+            summary="从旧 Canonical 编辑器保存",
+            validation_result={"ok": True, "errors": []},
+            test_result=tests,
+        )
         _register(service, root, value)
         service.journal(
             "canonical-persona-updated",
             persona_id=persona_id,
-            payload={"backup": str(backup), "version": value["version"]},
+            payload={
+                "backup": str(backup),
+                "version": value["version"],
+                "revision_id": revision.revision_id,
+            },
         )
-        return {"model": value, "backup": str(backup), "valid": True}
+        return {
+            "model": value,
+            "backup": str(backup),
+            "revision": revision.to_dict(),
+            "valid": True,
+            "tests": tests,
+        }
 
     @app.post("/api/personas/{persona_id}/migrate-v3")
     def migrate_persona(
@@ -136,13 +169,22 @@ def register_v3_routes(
             raise HTTPException(status_code=400, detail=str(error)) from error
         migrated_root = Path(result.project)
         value = load_canonical_persona(migrated_root)
+        revision = RevisionStore().capture(
+            persona_id,
+            value,
+            source="migration",
+            summary=f"Schema {result.from_schema} → {result.to_schema}",
+            validation_result={"ok": True, "errors": []},
+        )
         _register(service, migrated_root, value)
+        payload = result.to_dict()
+        payload["revision_id"] = revision.revision_id
         service.journal(
             "canonical-persona-migrated",
             persona_id=persona_id,
-            payload=result.to_dict(),
+            payload=payload,
         )
-        return result.to_dict()
+        return {**result.to_dict(), "revision": revision.to_dict()}
 
     @app.get("/api/personas/{persona_id}/tests")
     def persona_tests(
