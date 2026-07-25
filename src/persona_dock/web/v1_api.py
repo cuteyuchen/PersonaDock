@@ -13,7 +13,7 @@ from persona_dock.adapters.base import ADAPTER_API_VERSION
 from persona_dock.registry import RegistryService
 
 from .capabilities import capability_summary, list_capabilities
-from .jobs import JOB_STATUSES, TERMINAL_JOB_STATUSES, JobStatus, JobStore
+from .jobs import JOB_STATUSES, TERMINAL_JOB_STATUSES, JobStore
 
 _NAVIGATION = (
     {"id": "overview", "label": "概览", "route": "#/overview", "phase": 1},
@@ -90,7 +90,7 @@ def register_v1_routes(
             "version": __version__,
             "api_version": 1,
             "web_control_plane": 2,
-            "web_refactor_phase": 1,
+            "web_refactor_phase": 2,
             "control_plane": "local-first",
             "canonical_schema": 3,
             "persona_pack_format": 2,
