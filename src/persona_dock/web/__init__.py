@@ -12,6 +12,7 @@ from persona_dock.adapters.base import ADAPTER_API_VERSION
 from persona_dock.registry import RegistryService
 
 from .app import create_app as _create_base_app
+from .editor_api import register_editor_routes
 from .hermes_api import register_hermes_routes
 from .lifecycle_api import register_lifecycle_routes
 from .openclaw_api import register_openclaw_routes
@@ -48,7 +49,7 @@ def create_app(token: str | None = None):
             "version": __version__,
             "phase": 8,
             "web_control_plane": 2,
-            "web_refactor_phase": 2,
+            "web_refactor_phase": 3,
             "control_plane": "local",
             "registry": RegistryService().summary(),
             "canonical_schema": 3,
@@ -69,6 +70,7 @@ def create_app(token: str | None = None):
 
     register_v1_routes(app, require_token, RegistryService)
     register_lifecycle_routes(app, require_token, RegistryService)
+    register_editor_routes(app, require_token, RegistryService)
     register_v3_routes(app, require_token, RegistryService)
     register_hermes_routes(app, require_token, RegistryService)
     register_openclaw_routes(app, require_token, RegistryService)
