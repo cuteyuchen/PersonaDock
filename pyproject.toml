@@ -60,6 +60,8 @@ persona_dock = [
   "data/persona-builder/SKILL.md",
   "data/persona-builder/references/*.md",
   "web/static/*.html",
+  "web/static/*.css",
+  "web/static/*.js",
 ]
 
 [tool.pytest.ini_options]
