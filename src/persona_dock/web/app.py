@@ -6,7 +6,7 @@ from pathlib import Path
 from typing import Annotated, Any
 
 from fastapi import Depends, FastAPI, Header, HTTPException, Query
-from fastapi.responses import FileResponse, HTMLResponse
+from fastapi.responses import FileResponse, HTMLResponse, Response
 from pydantic import BaseModel, Field
 
 from persona_dock import __version__
@@ -43,8 +43,12 @@ class PersonaExportRequest(BaseModel):
     include_memory: bool = False
 
 
+def _static_text(name: str) -> str:
+    return files("persona_dock.web.static").joinpath(name).read_text(encoding="utf-8")
+
+
 def _index_html() -> str:
-    return files("persona_dock.web.static").joinpath("index.html").read_text(encoding="utf-8")
+    return _static_text("index.html")
 
 
 def _safe_export_path(value: str) -> Path:
@@ -82,6 +86,22 @@ def create_app(token: str | None = None) -> FastAPI:
     @app.get("/", response_class=HTMLResponse, include_in_schema=False)
     def index() -> str:
         return _index_html()
+
+    @app.get("/assets/app.css", include_in_schema=False)
+    def web_styles() -> Response:
+        return Response(
+            _static_text("app.css"),
+            media_type="text/css; charset=utf-8",
+            headers={"Cache-Control": "no-cache"},
+        )
+
+    @app.get("/assets/app.js", include_in_schema=False)
+    def web_application() -> Response:
+        return Response(
+            _static_text("app.js"),
+            media_type="text/javascript; charset=utf-8",
+            headers={"Cache-Control": "no-cache"},
+        )
 
     @app.get("/api/health")
     def health(_: None = Depends(require_token)) -> dict[str, Any]:
