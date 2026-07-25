@@ -42,7 +42,7 @@ DEFAULT_SYNC_POLICY: dict[str, Any] = {
     },
     "session_summaries": {
         "mode": "review",
-        "source_adapters": ["hermes", "openclaw"],
+        "source_adapters": ["hermes", "openclaw", "file"],
         "auto_approve": False,
         "max_sensitivity": "internal",
         "max_turns": 20,
