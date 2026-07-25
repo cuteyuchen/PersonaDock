@@ -3,290 +3,55 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>PersonaDock Control Plane</title>
-  <style>
-    :root { color-scheme: light dark; font-family: Inter, ui-sans-serif, system-ui, sans-serif; }
-    body { margin: 0; background: #0b1020; color: #eef2ff; }
-    main { max-width: 1180px; margin: 0 auto; padding: 28px 20px 56px; }
-    header, .toolbar, .section-head { display: flex; justify-content: space-between; gap: 16px; align-items: flex-start; }
-    header { margin-bottom: 22px; }
-    h1 { margin: 0 0 8px; font-size: 30px; }
-    h2 { margin: 0; font-size: 19px; }
-    h3 { margin: 0 0 8px; font-size: 16px; }
-    p { color: #aeb8d4; line-height: 1.55; }
-    .badge { border: 1px solid #33446d; border-radius: 999px; padding: 7px 11px; color: #b9c8f5; white-space: nowrap; }
-    .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(270px, 1fr)); gap: 14px; }
-    .metrics { grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); }
-    .card { background: #121a30; border: 1px solid #273452; border-radius: 15px; padding: 16px; }
-    .metric { font-size: 25px; font-weight: 700; margin-top: 6px; }
-    .muted { color: #93a0bf; }
-    .status-ready, .managed { color: #6ee7b7; }
-    .status-needs-path, .unmanaged { color: #fbbf24; }
-    .status-unavailable { color: #fca5a5; }
-    button, input, select { font: inherit; }
-    button { background: #6478ff; color: white; border: 0; border-radius: 10px; padding: 9px 12px; cursor: pointer; }
-    button.secondary { background: #273452; }
-    button.subtle { background: transparent; border: 1px solid #33446d; }
-    button:hover { filter: brightness(1.1); }
-    button:disabled { opacity: .55; cursor: wait; }
-    input, select { box-sizing: border-box; border: 1px solid #33446d; border-radius: 10px; padding: 10px; background: #0d1427; color: inherit; }
-    .toolbar { align-items: end; margin-bottom: 18px; }
-    .toolbar label { flex: 1; color: #aeb8d4; font-size: 14px; }
-    .actions { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 12px; }
-    .section { margin-top: 24px; }
-    .section-head { align-items: center; margin-bottom: 12px; }
-    code { color: #c7d2fe; overflow-wrap: anywhere; }
-    pre { white-space: pre-wrap; overflow-wrap: anywhere; background: #0b1123; border-radius: 12px; padding: 14px; color: #cbd5e1; }
-    .empty { color: #93a0bf; border: 1px dashed #33446d; border-radius: 14px; padding: 20px; }
-    .facts { display: grid; gap: 7px; margin-top: 12px; }
-    .facts div { color: #aeb8d4; }
-    .chips { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 10px; }
-    .chip { border: 1px solid #33446d; border-radius: 999px; padding: 4px 8px; font-size: 12px; color: #b9c8f5; }
-    .notice { border-left: 3px solid #6478ff; padding-left: 12px; color: #aeb8d4; }
-    @media (max-width: 680px) { header, .toolbar, .section-head { flex-direction: column; } .toolbar { align-items: stretch; } }
-  </style>
+  <meta name="color-scheme" content="light">
+  <title>PersonaDock</title>
+  <link rel="stylesheet" href="/assets/app.css">
 </head>
 <body>
-<main>
-  <header>
-    <div>
-      <h1>PersonaDock Control Plane</h1>
-      <p>Phase 2：发现、快照并接管现有 Hermes/OpenClaw 人格，一键导出 PersonaPack 或平台原生包。</p>
-    </div>
-    <div class="badge" id="health-badge">正在连接…</div>
-  </header>
-
-  <section class="toolbar card">
-    <label>远程访问令牌（本机无需填写）
-      <input id="token" type="password" autocomplete="off" placeholder="Bearer token">
-    </label>
-    <div class="actions">
-      <button id="refresh" class="secondary" type="button">刷新数据</button>
-      <button id="discover" type="button">扫描 Hermes 与 OpenClaw</button>
-    </div>
-  </section>
-
-  <section class="grid metrics">
-    <article class="card"><div class="muted">Persona</div><div class="metric" id="persona-count">—</div></article>
-    <article class="card"><div class="muted">运行实例</div><div class="metric" id="instance-count">—</div></article>
-    <article class="card"><div class="muted">已管理实例</div><div class="metric" id="managed-count">—</div></article>
-    <article class="card"><div class="muted">快照</div><div class="metric" id="snapshot-count">—</div></article>
-  </section>
-
-  <section class="section">
-    <div class="section-head">
-      <h2>人格注册表</h2>
-      <span class="muted">导出默认排除凭据、Session 和未审核记忆</span>
-    </div>
-    <div class="grid" id="personas"></div>
-  </section>
-
-  <section class="section">
-    <div class="section-head">
-      <h2>发现的运行实例</h2>
-      <span class="muted" id="discovery-status">尚未执行本轮扫描</span>
-    </div>
-    <p class="notice">接管会先创建只读快照。平台中的 Memory 只作为本地待审核候选，不会立即成为共享记忆。</p>
-    <div class="grid" id="instances"></div>
-  </section>
-
-  <section class="section">
-    <h2 style="margin-bottom: 12px;">Adapter 诊断</h2>
-    <div class="grid" id="adapters"></div>
-  </section>
-
-  <section class="card section">
-    <h2>最近操作</h2>
-    <pre id="raw">尚未加载</pre>
-  </section>
-</main>
-<script>
-  const tokenInput = document.getElementById('token');
-  const healthBadge = document.getElementById('health-badge');
-  const raw = document.getElementById('raw');
-  const discoverButton = document.getElementById('discover');
-
-  function authHeaders(extra = {}) {
-    const token = tokenInput.value.trim();
-    return token ? { ...extra, Authorization: `Bearer ${token}` } : extra;
-  }
-
-  async function request(path, options = {}) {
-    const response = await fetch(path, { ...options, headers: authHeaders(options.headers || {}) });
-    if (!response.ok) {
-      let detail = `${response.status} ${response.statusText}`;
-      try { detail = (await response.json()).detail || detail; } catch (_) {}
-      throw new Error(detail);
-    }
-    return response.json();
-  }
-
-  function escapeHtml(value) {
-    return String(value ?? '')
-      .replaceAll('&', '&amp;').replaceAll('<', '&lt;')
-      .replaceAll('>', '&gt;').replaceAll('"', '&quot;');
-  }
-
-  function adapterCard(adapter) {
-    const details = adapter.details || {};
-    return `<article class="card">
-      <div class="muted">${escapeHtml(adapter.adapter)}</div>
-      <div class="metric status-${escapeHtml(adapter.status)}">${escapeHtml(adapter.status)}</div>
-      <p>${escapeHtml(adapter.message)}</p>
-      ${details.target_path ? `<div><code>${escapeHtml(details.target_path)}</code></div>` : ''}
-      ${adapter.executable ? `<div class="muted">CLI: <code>${escapeHtml(adapter.executable)}</code></div>` : ''}
-    </article>`;
-  }
-
-  function personaCard(persona) {
-    return `<article class="card">
-      <h3>${escapeHtml(persona.name)}</h3>
-      <div class="muted"><code>${escapeHtml(persona.id)}</code> · v${escapeHtml(persona.version)}</div>
-      <p>${escapeHtml(persona.summary || '尚无摘要')}</p>
-      <div class="facts">
-        <div>Schema：${escapeHtml(persona.schema_version)}</div>
-        <div>源工程：<code>${escapeHtml(persona.source_path || '未绑定')}</code></div>
+  <div class="app-shell">
+    <aside class="sidebar" aria-label="主导航">
+      <div class="brand">
+        <div class="brand-mark" aria-hidden="true">PD</div>
+        <div class="brand-copy">
+          <div class="brand-name">PersonaDock</div>
+          <div class="brand-version" id="brand-version">正在连接控制面</div>
+        </div>
       </div>
-      <div class="actions">
-        <button class="subtle export-persona" data-persona="${escapeHtml(persona.id)}" data-format="personapack" type="button">导出 PersonaPack</button>
-        <button class="subtle export-persona" data-persona="${escapeHtml(persona.id)}" data-format="hermes-profile" type="button">导出 Hermes</button>
-        <button class="subtle export-persona" data-persona="${escapeHtml(persona.id)}" data-format="openclaw-workspace" type="button">导出 OpenClaw</button>
+      <nav class="sidebar-nav" id="sidebar-nav"></nav>
+      <div class="sidebar-footer">
+        本地优先控制平面<br>
+        Persona、运行时和密钥不上传
       </div>
-    </article>`;
-  }
+    </aside>
 
-  function instanceCard(instance) {
-    const metadata = instance.metadata || {};
-    const files = metadata.files || metadata.markers || [];
-    return `<article class="card">
-      <div class="section-head">
-        <h3>${escapeHtml(instance.display_name)}</h3>
-        <span class="${instance.managed ? 'managed' : 'unmanaged'}">${instance.managed ? '已管理' : '未管理'}</span>
-      </div>
-      <div class="muted">${escapeHtml(instance.adapter)} / <code>${escapeHtml(instance.platform_instance_id)}</code></div>
-      <div class="facts">
-        <div>传输：${escapeHtml(instance.transport)}</div>
-        <div>位置：<code>${escapeHtml(instance.location)}</code></div>
-        <div>来源：${escapeHtml(metadata.discovery_source || 'registry')}</div>
-        <div>Skills：${escapeHtml(metadata.skill_count ?? 0)}</div>
-      </div>
-      <div class="chips">${files.map(name => `<span class="chip">${escapeHtml(name)}</span>`).join('')}</div>
-      ${instance.managed ? '' : `<div class="actions"><button class="adopt-instance" data-instance="${escapeHtml(instance.id)}" type="button">快照并接管</button></div>`}
-    </article>`;
-  }
+    <div class="main-column">
+      <header class="topbar">
+        <div class="breadcrumbs">
+          <span>PersonaDock</span>
+          <span aria-hidden="true">/</span>
+          <strong id="route-title">概览</strong>
+        </div>
+        <div class="topbar-spacer"></div>
+        <div class="connection-state" id="connection-state">
+          <span class="connection-dot" aria-hidden="true"></span>
+          <span id="connection-label">正在连接</span>
+        </div>
+        <button class="icon-button" id="refresh-button" type="button" title="刷新当前页面" aria-label="刷新当前页面">↻</button>
+        <button class="button small" id="token-button" type="button">访问令牌</button>
+      </header>
+      <div class="loading-line" id="loading-line" hidden></div>
+      <main class="workspace" id="workspace" tabindex="-1">
+        <div class="empty-state"><strong>正在加载控制面</strong>正在读取本地 Registry 和 Web Capability。</div>
+      </main>
+    </div>
+  </div>
 
-  function renderList(elementId, values, renderer, emptyText) {
-    const element = document.getElementById(elementId);
-    element.innerHTML = values.length ? values.map(renderer).join('') : `<div class="empty">${escapeHtml(emptyText)}</div>`;
-  }
+  <div class="toast-region" id="toast-region" aria-live="polite"></div>
+  <div id="dialog-root"></div>
 
-  async function refresh() {
-    healthBadge.textContent = '正在连接…';
-    try {
-      const [health, doctor, personas, instances] = await Promise.all([
-        request('/api/health'), request('/api/doctor'), request('/api/personas'), request('/api/instances')
-      ]);
-      healthBadge.textContent = `运行正常 · Phase ${health.phase}`;
-      healthBadge.className = 'badge status-ready';
-      const registry = health.registry || {};
-      document.getElementById('persona-count').textContent = registry.personas ?? 0;
-      document.getElementById('instance-count').textContent = registry.instances ?? 0;
-      document.getElementById('managed-count').textContent = registry.managed_instances ?? 0;
-      document.getElementById('snapshot-count').textContent = registry.snapshots ?? 0;
-      renderList('personas', personas, personaCard, '尚未注册 Persona。可创建新人格，或扫描并接管现有实例。');
-      renderList('instances', instances, instanceCard, '尚未发现运行实例。点击“扫描 Hermes 与 OpenClaw”。');
-      document.getElementById('adapters').innerHTML = doctor.adapters.map(adapterCard).join('');
-      raw.textContent = JSON.stringify({ health, doctor, personas, instances }, null, 2);
-    } catch (error) {
-      healthBadge.textContent = '连接失败';
-      healthBadge.className = 'badge status-unavailable';
-      raw.textContent = String(error);
-    }
-  }
-
-  async function discover() {
-    discoverButton.disabled = true;
-    document.getElementById('discovery-status').textContent = '正在只读扫描…';
-    try {
-      const report = await request('/api/discover', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ target: null })
-      });
-      document.getElementById('discovery-status').textContent = `本轮发现 ${report.instances.length} 个实例`;
-      raw.textContent = JSON.stringify(report, null, 2);
-      await refresh();
-    } catch (error) {
-      document.getElementById('discovery-status').textContent = `扫描失败：${error}`;
-    } finally {
-      discoverButton.disabled = false;
-    }
-  }
-
-  async function adoptInstance(button) {
-    const instanceId = button.dataset.instance;
-    button.disabled = true;
-    try {
-      const payload = { instance_id: instanceId };
-      const preview = await request('/api/adoptions/preview', {
-        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload)
-      });
-      const message = `接管 ${preview.instance.adapter}/${preview.instance.platform_instance_id}\n\n` +
-        `Persona ID：${preview.persona_id}\n目标：${preview.destination}\n` +
-        `Skills：${preview.skills.length}\nMemory 候选：${preview.memory_documents.length}\n\n` +
-        `将先创建只读快照。继续？`;
-      if (!window.confirm(message)) return;
-      const result = await request('/api/adoptions', {
-        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload)
-      });
-      raw.textContent = JSON.stringify(result, null, 2);
-      await refresh();
-    } catch (error) {
-      raw.textContent = `接管失败：${error}`;
-    } finally {
-      button.disabled = false;
-    }
-  }
-
-  async function exportPersona(button) {
-    const personaId = button.dataset.persona;
-    const format = button.dataset.format;
-    button.disabled = true;
-    try {
-      const result = await request(`/api/personas/${encodeURIComponent(personaId)}/exports`, {
-        method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ format, include_memory: false })
-      });
-      const downloadUrl = `/api/exports/download?path=${encodeURIComponent(result.path)}`;
-      const response = await fetch(downloadUrl, { headers: authHeaders() });
-      if (!response.ok) throw new Error(`${response.status} ${response.statusText}`);
-      const blob = await response.blob();
-      const url = URL.createObjectURL(blob);
-      const anchor = document.createElement('a');
-      anchor.href = url;
-      anchor.download = result.path.split(/[\\/]/).pop();
-      document.body.appendChild(anchor);
-      anchor.click();
-      anchor.remove();
-      URL.revokeObjectURL(url);
-      raw.textContent = JSON.stringify(result, null, 2);
-    } catch (error) {
-      raw.textContent = `导出失败：${error}`;
-    } finally {
-      button.disabled = false;
-    }
-  }
-
-  document.getElementById('refresh').addEventListener('click', refresh);
-  discoverButton.addEventListener('click', discover);
-  document.addEventListener('click', event => {
-    const adoptButton = event.target.closest('.adopt-instance');
-    if (adoptButton) adoptInstance(adoptButton);
-    const exportButton = event.target.closest('.export-persona');
-    if (exportButton) exportPersona(exportButton);
-  });
-  tokenInput.addEventListener('keydown', event => { if (event.key === 'Enter') refresh(); });
-  refresh();
-</script>
+  <noscript>
+    <div style="padding:24px;font-family:system-ui,sans-serif">PersonaDock Web 控制面需要启用 JavaScript。</div>
+  </noscript>
+  <script src="/assets/app.js" defer></script>
 </body>
 </html>
