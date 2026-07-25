@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import json
-import sqlite3
 from pathlib import Path
 
 import pytest
@@ -101,11 +100,6 @@ def test_parser_filters_system_tools_and_redacts_secrets(tmp_path: Path) -> None
 
 def test_import_is_review_first_and_never_persists_raw_transcript(tmp_path: Path) -> None:
     service, _ = _service(tmp_path)
-    sync = SyncRegistry(service)
-    sync.set_policy(
-        "xiaoyou",
-        {"session_summaries": {"source_adapters": ["hermes", "openclaw", "file"]}},
-    )
     source = _export(tmp_path / "session.jsonl")
     engine = SessionSummaryEngine(service)
     first = engine.import_file("xiaoyou", source)
@@ -192,10 +186,6 @@ def test_automatic_summary_approval_requires_explicit_safe_policy(tmp_path: Path
         _export(tmp_path / "restricted.jsonl", secret=True),
     )
     assert restricted["auto_approved"] == 0
-    pending = next(
-        item for item in engine.sessions.list("xiaoyou")
-        if item.transcript_hash != engine.sessions.list("xiaoyou")[-1].transcript_hash
-    )
     assert any(item.status == "pending" for item in engine.sessions.list("xiaoyou"))
 
 
