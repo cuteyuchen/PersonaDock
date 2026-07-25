@@ -103,6 +103,14 @@ def create_app(token: str | None = None) -> FastAPI:
             headers={"Cache-Control": "no-cache"},
         )
 
+    @app.get("/assets/lifecycle.js", include_in_schema=False)
+    def lifecycle_application() -> Response:
+        return Response(
+            _static_text("lifecycle.js"),
+            media_type="text/javascript; charset=utf-8",
+            headers={"Cache-Control": "no-cache"},
+        )
+
     @app.get("/api/health")
     def health(_: None = Depends(require_token)) -> dict[str, Any]:
         return {
