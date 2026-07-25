@@ -12,7 +12,7 @@ _ASSETS = {
 
 
 def register_phase_asset_routes(app: FastAPI) -> None:
-    @app.get("/assets/phase/{asset_name}", include_in_schema=False)
+    @app.get("/assets/{asset_name}", include_in_schema=False)
     def phase_asset(asset_name: str) -> Response:
         media_type = _ASSETS.get(asset_name)
         if media_type is None:
