@@ -4,6 +4,18 @@
 目标版本：PersonaDock 2.0  
 执行方式：直接在 `main` 分阶段提交；每个阶段必须独立通过 CI 后再进入下一阶段。
 
+## 执行状态
+
+| 阶段 | 状态 | 主要结果 | 验收 |
+|---|---|---|---|
+| Phase 0 | 已完成 | 路线、Capability、Job、Revision、AI 与安全契约 | 文档已进入 `main` |
+| Phase 1 | 已完成 | Web 2.0 Shell、`/api/v1`、Capability Registry、持久化 Job/SSE、嵌入式资源 | 主分支 bundle 通过 |
+| Phase 2 | 已完成 | 共用 Persona Service、安全创建/注册、Runtime Discovery、Adoption、导出和 Web 工作流 | 主分支 bundle `30165667340` 通过 |
+| Phase 3 | 进行中 | 编辑、Revision、Diff、测试 | — |
+| Phase 4–8 | 未开始 | 按下述路线继续 | — |
+
+Phase 1–2 保留 `/canonical`、`/hermes`、`/openclaw`、`/sync` 和 `/sessions` 兼容页面。新功能不通过 Shell 调用 CLI；CLI `init` 已与 Web 共用 `PersonaApplicationService`。
+
 ## 1. 产品目标
 
 PersonaDock Web 2.0 是本地优先的人格控制平面，不是 CLI 的展示壳。最终网页端应覆盖所有公开 CLI Capability，并增加版本、差异、部署计划、冲突审核和 AI 人格生成等更适合图形界面的能力。
