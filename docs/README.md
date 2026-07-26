@@ -1,11 +1,12 @@
 # PersonaDock 文档索引
 
-本目录对应 PersonaDock `1.0.x`。根目录 `README.md` 提供快速上手；这里按任务组织设计、运行和维护文档。
+本目录对应 PersonaDock `1.0.x` 与 Web Control Plane 2。根目录 `README.md` 提供快速上手；这里按任务组织设计、运行和维护文档。
 
 ## 从这里开始
 
 - [控制平面总览](control-plane.md)：当前架构、数据边界、主要工作流和 Web 页面。
-- [阶段与稳定契约](PHASE_STATUS.md)：Phase 0–8 的最终合并状态以及 1.0 兼容边界。
+- [Web Control Plane 2.0](WEB_REFACTOR_PLAN.md)：网页端完整能力、AI Studio、安全边界、阶段实现与验收。
+- [阶段与稳定契约](PHASE_STATUS.md)：核心 Phase 0–8 的最终合并状态以及 1.0 兼容边界。
 - [迁移与回滚](migration-and-rollback.md)：应用、Registry、Persona、Hermes/OpenClaw、Memory 与 Session Summary 的恢复流程。
 - [维护审计](maintenance-audit.md)：分支、废弃代码、历史文档和兼容入口的清理结论。
 
@@ -41,7 +42,7 @@ PersonaDock 不同步原始 Session 或 Transcript。只有经过过滤、脱敏
 - [版本历史](releases.md)
 - [历史重构路线](REFACTOR_PLAN.md)
 
-`REFACTOR_PLAN.md` 是 Phase 0–8 的历史设计记录，不再作为当前功能状态来源。当前状态以 `PHASE_STATUS.md`、根目录 `README.md` 和对应功能文档为准。
+`REFACTOR_PLAN.md` 是核心 Phase 0–8 的历史设计记录。当前核心稳定状态以 `PHASE_STATUS.md` 为准；Web 2.0 状态以 `WEB_REFACTOR_PLAN.md` 为准。
 
 ## 文档维护规则
 
@@ -49,4 +50,5 @@ PersonaDock 不同步原始 Session 或 Transcript。只有经过过滤、脱敏
 2. Hermes/OpenClaw 默认使用原生 Adapter；Legacy Filesystem 只能在明确兼容章节中出现。
 3. Phase 标题可以保留功能来源，但不得把已经完成的后续阶段写成“未实现”。
 4. Schema、Manifest、Adapter API 或 Registry Schema 发生变化时，同步更新 `compatibility.md`、`PHASE_STATUS.md` 和 `CHANGELOG.md`。
-5. 发布命令、平台矩阵和资产名称必须与 GitHub Actions 工作流保持一致。
+5. Web Capability、CLI 顶层命令或安全边界发生变化时，同步更新 `WEB_REFACTOR_PLAN.md`。
+6. 发布命令、平台矩阵和资产名称必须与 GitHub Actions 工作流保持一致。
