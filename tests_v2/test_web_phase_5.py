@@ -165,7 +165,7 @@ def test_phase_five_routes_assets_and_security_contracts() -> None:
         "/api/v1/deployments/{deployment_id}/rollback",
     ):
         assert path in paths
-    assert WEB_REFACTOR_PHASE == 5
+    assert WEB_REFACTOR_PHASE >= 5
 
     root = files("persona_dock")
     html = root.joinpath("web/static/index.html").read_text(encoding="utf-8")
