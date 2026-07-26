@@ -15,6 +15,7 @@ from .app import create_app as _create_base_app
 from .artifact_api import register_artifact_routes
 from .deployment_api import register_deployment_routes
 from .editor_api import register_editor_routes
+from .governance_api import register_governance_routes
 from .hermes_api import register_hermes_routes
 from .lifecycle_api import register_lifecycle_routes
 from .openclaw_api import register_openclaw_routes
@@ -78,6 +79,7 @@ def create_app(token: str | None = None):
     register_editor_routes(app, require_token, RegistryService)
     register_artifact_routes(app, require_token, RegistryService)
     register_deployment_routes(app, require_token, RegistryService)
+    register_governance_routes(app, require_token, RegistryService)
     register_v3_routes(app, require_token, RegistryService)
     register_hermes_routes(app, require_token, RegistryService)
     register_openclaw_routes(app, require_token, RegistryService)
