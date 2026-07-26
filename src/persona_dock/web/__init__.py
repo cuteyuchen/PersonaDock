@@ -11,6 +11,7 @@ from persona_dock import __version__
 from persona_dock.adapters.base import ADAPTER_API_VERSION
 from persona_dock.registry import RegistryService
 
+from .ai_api import register_ai_routes
 from .app import create_app as _create_base_app
 from .artifact_api import register_artifact_routes
 from .deployment_api import register_deployment_routes
@@ -80,6 +81,7 @@ def create_app(token: str | None = None):
     register_artifact_routes(app, require_token, RegistryService)
     register_deployment_routes(app, require_token, RegistryService)
     register_governance_routes(app, require_token, RegistryService)
+    register_ai_routes(app, require_token, RegistryService)
     register_v3_routes(app, require_token, RegistryService)
     register_hermes_routes(app, require_token, RegistryService)
     register_openclaw_routes(app, require_token, RegistryService)
