@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import hmac
 import os
 from importlib.resources import files
 from pathlib import Path
@@ -17,6 +18,12 @@ from persona_dock.doctor import doctor_report
 from persona_dock.exports import EXPORT_FORMATS, export_registered_persona
 from persona_dock.registry import RegistryService
 from persona_dock.registry.database import registry_root
+
+from .security import (
+    RequestSizeLimitMiddleware,
+    SecurityHeadersMiddleware,
+    configured_body_limit,
+)
 
 
 class DeploymentPlanRequest(BaseModel):
@@ -70,6 +77,8 @@ def create_app(token: str | None = None) -> FastAPI:
         docs_url="/api/docs",
         redoc_url=None,
     )
+    app.add_middleware(RequestSizeLimitMiddleware, max_body_bytes=configured_body_limit())
+    app.add_middleware(SecurityHeadersMiddleware)
 
     def require_token(
         authorization: Annotated[str | None, Header()] = None,
@@ -77,7 +86,7 @@ def create_app(token: str | None = None) -> FastAPI:
         if token is None:
             return
         expected = f"Bearer {token}"
-        if authorization != expected:
+        if authorization is None or not hmac.compare_digest(authorization, expected):
             raise HTTPException(status_code=401, detail="invalid or missing bearer token")
 
     def registry() -> RegistryService:
