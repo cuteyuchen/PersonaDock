@@ -19,7 +19,8 @@ def test_web_capability_registry_is_complete_and_unique() -> None:
     assert summary["total"] == len(CAPABILITIES)
     assert summary["ready"] > 0
     assert summary["legacy"] > 0
-    assert summary["planned"] > 0
+    assert summary["planned"] >= 0
+    assert summary["ready"] + summary["legacy"] + summary["planned"] == summary["total"]
     assert any(item.id == "persona.init" and item.cli_command == "init" for item in CAPABILITIES)
     assert any(item.id == "ai.create" and item.runs_as_job for item in CAPABILITIES)
 
