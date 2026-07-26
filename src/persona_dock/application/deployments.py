@@ -6,7 +6,7 @@ import json
 import secrets
 import sqlite3
 from copy import deepcopy
-from dataclasses import asdict, dataclass
+from dataclasses import asdict, dataclass, replace
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Callable
@@ -249,6 +249,8 @@ class DeploymentApplicationService:
         openclaw_planner: Callable[..., Any] = plan_openclaw_deployment,
         openclaw_applier: Callable[..., Any] = apply_openclaw_deployment,
         openclaw_rollback: Callable[..., Any] = rollback_openclaw_deployment,
+        hermes_adapter_factory: Callable[..., Any] = HermesAdapter,
+        openclaw_adapter_factory: Callable[..., Any] = OpenClawAdapter,
     ) -> None:
         self.registry = registry or RegistryService()
         self.artifacts = artifacts or ArtifactApplicationService(
@@ -261,6 +263,8 @@ class DeploymentApplicationService:
         self.openclaw_planner = openclaw_planner
         self.openclaw_applier = openclaw_applier
         self.openclaw_rollback = openclaw_rollback
+        self.hermes_adapter_factory = hermes_adapter_factory
+        self.openclaw_adapter_factory = openclaw_adapter_factory
 
     def _package(self, request: dict[str, Any]) -> Path:
         package_path = request.get("package_path")
@@ -280,7 +284,7 @@ class DeploymentApplicationService:
         package = self._package(request)
         if target == "hermes":
             container = request.get("container") or None
-            adapter = HermesAdapter(container=container)
+            adapter = self.hermes_adapter_factory(container=container)
             plan = self.hermes_planner(
                 package,
                 profile=request.get("profile") or None,
@@ -294,7 +298,9 @@ class DeploymentApplicationService:
         if target == "openclaw":
             container = request.get("container") or None
             ssh_host = request.get("ssh_host") or None
-            adapter = OpenClawAdapter(container=container, ssh_host=ssh_host)
+            adapter = self.openclaw_adapter_factory(
+                container=container, ssh_host=ssh_host
+            )
             plan = self.openclaw_planner(
                 package,
                 agent=request.get("agent") or None,
@@ -340,16 +346,19 @@ class DeploymentApplicationService:
             raise DeploymentPlanChangedError(
                 "deployment inputs or runtime state changed; create a new plan"
             )
+        refreshed = replace(refreshed, id=record.id)
 
         self.store.update(plan_id, status="applying")
         try:
             if kind == "hermes":
-                adapter = HermesAdapter(container=record.request.get("container") or None)
+                adapter = self.hermes_adapter_factory(
+                    container=record.request.get("container") or None
+                )
                 result = self.hermes_applier(
                     refreshed, adapter=adapter, registry=self.registry
                 ).to_dict()
             else:
-                adapter = OpenClawAdapter(
+                adapter = self.openclaw_adapter_factory(
                     container=record.request.get("container") or None,
                     ssh_host=record.request.get("ssh_host") or None,
                 )
@@ -384,13 +393,17 @@ class DeploymentApplicationService:
                     agent=str(output["agent"]),
                     snapshot=output.get("snapshot_path"),
                     workspace=output.get("workspace"),
-                    delete_agent=bool(output.get("created_agent") and not output.get("snapshot_path")),
+                    delete_agent=bool(
+                        output.get("created_agent") and not output.get("snapshot_path")
+                    ),
                     container=request.get("container") or None,
                     ssh_host=request.get("ssh_host") or None,
                     registry=self.registry,
                 )
         except Exception as error:
-            self.store.update(deployment_id, status="rollback-failed", error=str(error))
+            self.store.update(
+                deployment_id, status="rollback-failed", error=str(error)
+            )
             raise
         value = self.store.update(
             deployment_id,
