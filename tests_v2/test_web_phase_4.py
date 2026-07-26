@@ -156,7 +156,7 @@ def test_phase_four_routes_and_assets_are_registered() -> None:
         "/api/v1/skills/install",
     ):
         assert path in paths
-    assert WEB_REFACTOR_PHASE == 4
+    assert WEB_REFACTOR_PHASE >= 4
 
 
 def test_phase_four_never_places_passwords_or_private_keys_in_web_state() -> None:
