@@ -93,7 +93,19 @@ jobs:
           python -m pip install pyinstaller
 
       - name: Run tests
-        run: pytest
+        shell: bash
+        run: |
+          set -o pipefail
+          pytest 2>&1 | tee pytest.log
+
+      - name: Upload pytest diagnostics
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: pytest-${{ github.sha }}
+          path: pytest.log
+          if-no-files-found: ignore
+          retention-days: 7
 
       - name: Validate installer scripts
         shell: bash
