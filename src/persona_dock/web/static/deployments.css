@@ -1,0 +1,181 @@
+.deployment-shell {
+  display: grid;
+  gap: 16px;
+}
+
+.deployment-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1.3fr) minmax(320px, .7fr);
+  gap: 16px;
+  align-items: start;
+}
+
+.deployment-form {
+  display: grid;
+  gap: 14px;
+}
+
+.deployment-source-tabs,
+.deployment-target-tabs {
+  display: inline-flex;
+  gap: 2px;
+  padding: 2px;
+  border: 1px solid var(--line);
+  background: var(--surface-muted);
+}
+
+.deployment-tab {
+  min-height: 30px;
+  padding: 5px 10px;
+  border: 1px solid transparent;
+  border-radius: 2px;
+  background: transparent;
+  color: var(--text-soft);
+  cursor: pointer;
+}
+
+.deployment-tab.active {
+  border-color: var(--line-strong);
+  background: var(--surface-strong);
+  color: var(--text);
+  box-shadow: 0 1px 1px rgb(24 25 23 / 4%);
+}
+
+.deployment-options {
+  display: grid;
+  gap: 12px;
+  padding: 14px;
+  border: 1px solid var(--line);
+  background: var(--surface-muted);
+}
+
+.deployment-options[hidden] { display: none; }
+
+.deployment-plan {
+  display: grid;
+  gap: 12px;
+}
+
+.plan-summary {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  border: 1px solid var(--line);
+  background: var(--surface-strong);
+}
+
+.plan-summary-cell {
+  min-width: 0;
+  padding: 11px 12px;
+  border-right: 1px solid var(--line);
+}
+
+.plan-summary-cell:last-child { border-right: 0; }
+.plan-summary-cell span { display: block; color: var(--text-faint); font-size: 10px; }
+.plan-summary-cell strong { display: block; margin-top: 5px; overflow-wrap: anywhere; }
+
+.plan-section {
+  border: 1px solid var(--line);
+  background: var(--surface);
+}
+
+.plan-section-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  min-height: 40px;
+  padding: 8px 11px;
+  border-bottom: 1px solid var(--line);
+  background: var(--surface-muted);
+}
+
+.plan-section-body { padding: 10px 11px; }
+
+.plan-list {
+  display: grid;
+  gap: 0;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.plan-list li {
+  padding: 8px 0;
+  border-bottom: 1px solid #e4e3de;
+  line-height: 1.45;
+  overflow-wrap: anywhere;
+}
+
+.plan-list li:last-child { border-bottom: 0; }
+
+.command-list code {
+  display: block;
+  padding: 7px 8px;
+  border: 1px solid var(--line);
+  background: #f0efe9;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.risk-banner {
+  padding: 10px 11px;
+  border: 1px solid #d2a19c;
+  border-left-width: 3px;
+  background: var(--danger-soft);
+  color: #74332d;
+  line-height: 1.5;
+}
+
+.warning-list li { color: #725213; }
+.preserve-list li { color: #285344; }
+.conflict-list li { color: var(--danger); font-weight: 600; }
+
+.apply-strip {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  padding: 12px;
+  border: 1px solid var(--line-strong);
+  background: var(--surface-strong);
+}
+
+.apply-strip p { margin: 0; color: var(--text-soft); line-height: 1.45; }
+
+.deployment-history .data-table td { vertical-align: middle; }
+.deployment-id { max-width: 230px; overflow: hidden; text-overflow: ellipsis; }
+
+.transport-row {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.binding-editor {
+  min-height: 92px;
+  resize: vertical;
+  font-family: "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+  font-size: 12px;
+}
+
+.deployment-detail-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+}
+
+@media (max-width: 1100px) {
+  .deployment-layout,
+  .deployment-detail-grid { grid-template-columns: 1fr; }
+  .plan-summary { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .plan-summary-cell:nth-child(2) { border-right: 0; }
+  .plan-summary-cell:nth-child(-n+2) { border-bottom: 1px solid var(--line); }
+}
+
+@media (max-width: 720px) {
+  .plan-summary,
+  .transport-row { grid-template-columns: 1fr; }
+  .plan-summary-cell { border-right: 0; border-bottom: 1px solid var(--line); }
+  .plan-summary-cell:last-child { border-bottom: 0; }
+  .apply-strip { align-items: stretch; flex-direction: column; }
+}
