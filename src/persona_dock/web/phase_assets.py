@@ -14,6 +14,8 @@ _ASSETS = {
     "deployments.js": "text/javascript; charset=utf-8",
     "governance.css": "text/css; charset=utf-8",
     "governance.js": "text/javascript; charset=utf-8",
+    "ai.css": "text/css; charset=utf-8",
+    "ai.js": "text/javascript; charset=utf-8",
 }
 
 
