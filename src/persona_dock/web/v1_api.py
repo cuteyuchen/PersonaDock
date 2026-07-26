@@ -14,6 +14,7 @@ from persona_dock.registry import RegistryService
 
 from .capabilities import capability_summary, list_capabilities
 from .jobs import JOB_STATUSES, TERMINAL_JOB_STATUSES, JobStore
+from .parity import parity_report
 from .version import WEB_CONTROL_PLANE_VERSION, WEB_REFACTOR_PHASE
 
 _NAVIGATION = (
@@ -86,6 +87,7 @@ def register_v1_routes(
 ) -> None:
     @app.get("/api/v1/meta")
     def meta(_: None = Depends(require_token)) -> dict[str, Any]:
+        parity = parity_report()
         return {
             "product": "PersonaDock",
             "version": __version__,
@@ -97,6 +99,10 @@ def register_v1_routes(
             "persona_pack_format": 2,
             "adapter_api_version": ADAPTER_API_VERSION,
             "capabilities": capability_summary(),
+            "cli_web_parity": {
+                "complete": parity["complete"],
+                "command_count": len(parity["commands"]),
+            },
             "navigation": list(_NAVIGATION),
         }
 
@@ -109,6 +115,10 @@ def register_v1_routes(
             "summary": capability_summary(),
             "items": list_capabilities(status=status),
         }
+
+    @app.get("/api/v1/parity")
+    def cli_web_parity(_: None = Depends(require_token)) -> dict[str, Any]:
+        return parity_report()
 
     @app.get("/api/v1/dashboard")
     def dashboard(_: None = Depends(require_token)) -> dict[str, Any]:
