@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import hmac
 import os
 from typing import Annotated, Any
 
@@ -36,7 +37,8 @@ def create_app(token: str | None = None):
     ) -> None:
         if token is None:
             return
-        if authorization != f"Bearer {token}":
+        expected = f"Bearer {token}"
+        if authorization is None or not hmac.compare_digest(authorization, expected):
             raise HTTPException(status_code=401, detail="invalid or missing bearer token")
 
     app.router.routes = [
