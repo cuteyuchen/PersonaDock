@@ -1,269 +1,222 @@
 # PersonaDock Web Control Plane 2.0
 
-状态：执行中  
-目标版本：PersonaDock 2.0  
-执行方式：直接在 `main` 分阶段提交；每个阶段必须独立通过 CI 后再进入下一阶段。
+状态：功能实现完成，进入持续维护  
+执行方式：全部直接提交到 `main`，每阶段通过主分支 bundle 后进入下一阶段。  
+控制面版本：Web Control Plane 2，Refactor Phase 8
 
-## 执行状态
+## 实施结果
 
-| 阶段 | 状态 | 主要结果 | 验收 |
-|---|---|---|---|
-| Phase 0 | 已完成 | 路线、Capability、Job、Revision、AI 与安全契约 | 文档已进入 `main` |
-| Phase 1 | 已完成 | Web 2.0 Shell、`/api/v1`、Capability Registry、持久化 Job/SSE、嵌入式资源 | 主分支 bundle 通过 |
-| Phase 2 | 已完成 | 共用 Persona Service、安全创建/注册、Runtime Discovery、Adoption、导出和 Web 工作流 | 主分支 bundle `30165667340` 通过 |
-| Phase 3 | 进行中 | 编辑、Revision、Diff、测试 | — |
-| Phase 4–8 | 未开始 | 按下述路线继续 | — |
+| 阶段 | 状态 | 主要结果 |
+|---|---|---|
+| Phase 0 | 已完成 | 路线、Capability、Job、Revision、AI 与安全契约 |
+| Phase 1 | 已完成 | 统一 Web Shell、`/api/v1`、Capability Registry、持久化 Job/SSE、嵌入式资源 |
+| Phase 2 | 已完成 | Persona 创建/注册、Discovery、Adoption、导出与共用应用服务 |
+| Phase 3 | 已完成 | Canonical 编辑、内容寻址 Revision、语义 Diff、测试、迁移与编译预览 |
+| Phase 4 | 已完成 | Build、PersonaPack、签名、加密备份、Character Card、Adapter 与 Skill |
+| Phase 5 | 已完成 | Hermes/OpenClaw 原生部署 Plan/Apply/Verify/Rollback 与部署历史 |
+| Phase 6 | 已完成 | Memory/Session Policy、Collect、Review、Conflict、Plan、Apply 与任务记录 |
+| Phase 7 | 已完成 | 加密 Provider Secret、Create/Distill/Hybrid/Refine、Diff、测试与 Revision 应用 |
+| Phase 8 | 已完成 | CLI/Web parity、安全中间件、请求限制、最终测试与独立程序验收 |
 
-Phase 1–2 保留 `/canonical`、`/hermes`、`/openclaw`、`/sync` 和 `/sessions` 兼容页面。新功能不通过 Shell 调用 CLI；CLI `init` 已与 Web 共用 `PersonaApplicationService`。
+旧 `/canonical`、`/hermes`、`/openclaw`、`/sync` 和 `/sessions` 页面继续作为 1.x 兼容入口。新工作台不通过 Shell 调用 CLI；Web 和 CLI 复用 Persona、Revision、Artifact、Deployment、Adapter 和治理引擎。
 
-## 1. 产品目标
+## 产品边界
 
-PersonaDock Web 2.0 是本地优先的人格控制平面，不是 CLI 的展示壳。最终网页端应覆盖所有公开 CLI Capability，并增加版本、差异、部署计划、冲突审核和 AI 人格生成等更适合图形界面的能力。
+PersonaDock Web 2.0 是本地优先的人格控制平面，不是云端人格托管服务，也不是 CLI 输出查看器。
 
-核心原则：
+用户可以不打开终端完成：
 
-1. CLI 与 Web 共用应用服务，不通过 Shell 调用 CLI。
-2. 写操作遵循 Plan → Review → Apply，失败可恢复。
-3. AI 只生成候选 Revision，不直接覆盖或部署。
-4. Persona 工程仍是真实来源；Registry、Revision、Job 只管理索引和历史。
-5. 默认不上传聊天，不同步原始 Session/Transcript，不暴露认证和密钥。
-6. 前端采用桌面工具式设计：高信息密度、克制色彩、少装饰性卡片和渐变，避免模板化 AI 仪表盘风格。
+```text
+配置大模型
+→ 创建、注册、导入或接管 Persona
+→ AI 生成或优化草稿
+→ 审核 Canonical、Diff、测试和编译结果
+→ 创建 Revision
+→ 构建、打包、签名和备份
+→ 扫描 Hermes/OpenClaw Runtime
+→ 审核部署计划并部署或回滚
+→ 审核 Memory 与 Session Summary
+```
 
-## 2. 信息架构
+始终保持：
 
-主导航：
+- Persona 工程是真实来源。
+- AI 只产生候选草稿，不自动覆盖、部署或同步。
+- 原始 Session/Transcript 双向同步关闭。
+- 写操作可审核、可记录、可恢复。
+- API Key、签名私钥和备份密码不进入浏览器状态或普通数据库。
 
-- 概览
-- 人格
-- AI 人格工作室
-- 差异中心
-- 运行实例
-- 部署
-- Memory 同步
-- Session Summary
-- PersonaPack 与信任
-- 备份
-- Character Card
-- Adapter 与 Skill
-- 任务中心
-- 系统设置
+## 前端设计
 
-Persona 详情子页面：概览、编辑、行为与边界、测试、版本与差异、构建与打包、运行时绑定、部署历史、Memory、Session Summary、备份、活动记录。
+当前实现采用随 Python 包和独立程序分发的模块化前端，无公网 CDN 和运行时 Node.js 依赖。
 
-## 3. 技术架构
+视觉原则：
+
+- 偏桌面管理工具，而不是聊天机器人。
+- 深色窄侧栏、暖色浅工作区、低圆角。
+- 表格、窄表单、Diff 和日志优先。
+- 不使用渐变、发光、紫色 AI 模板和大面积营销卡片。
+- AI 页面使用“任务参数 → 审查结果 → 明确应用”，不使用聊天气泡。
+
+原路线曾考虑 Vue 3 + TypeScript 和 Playwright。为保持独立程序资源简单、避免引入第二套发布工具链，本轮使用模块化原生前端和 pytest/ASGI/静态契约集成测试完成验收。未来迁移前端工具链时，必须保持现有 `/api/v1`、路由和 Capability 契约。
+
+## 架构
 
 ```text
 CLI ──────────────┐
 Web API ──────────┼→ Application Services → Registry / Domain / Adapter
-Scheduled Job ────┘                         → Hermes / OpenClaw / Filesystem
+Job Center ───────┘                         → Hermes / OpenClaw
 ```
 
-应用服务边界：
+主要服务：
 
-- `PersonaService`
-- `RevisionService`
-- `BuildService`
-- `PackageService`
-- `RuntimeService`
-- `DeploymentService`
-- `SyncService`
-- `SessionService`
-- `TrustService`
-- `BackupService`
-- `CharacterCardService`
-- `AdapterService`
-- `SkillService`
-- `AIStudioService`
-- `JobService`
-- `AuditService`
+- `PersonaApplicationService`
+- `RevisionStore`
+- `ArtifactApplicationService`
+- `DeploymentApplicationService`
+- `SyncEngine`
+- `SessionSummaryEngine`
+- `AIPersonaStudio`
+- `ProviderStore` / `SecretVault`
+- `JobStore`
 
-API 使用 `/api/v1` 版本前缀。旧 API 在 1.x 兼容期内保留，并逐步委托到相同服务。
+## 页面与能力
 
-前端资源必须随 Python 包和独立可执行程序分发，不依赖公网 CDN。第一步先建立无构建依赖的模块化 SPA Shell；当完整前端工具链加入发布流水线后，再迁移到 Vue 3 + TypeScript，API 和页面契约保持不变。
+### 概览、Persona 与 Revision
 
-## 4. Capability 一致性契约
+- Persona 列表、详情、新建和注册。
+- Runtime Discovery 与 Adoption。
+- 结构化编辑、JSON 编辑与编译预览。
+- 每次保存创建内容寻址 Revision。
+- 任意 Revision 语义 Diff、风险提示和恢复计划。
+- Validate、Scenario Test 和 Canonical v3 Migration。
 
-每个公开能力必须注册以下信息：
+### Package、信任与备份
+
+- Generic、Hermes、OpenClaw Build。
+- PersonaPack Create/Inspect/Public Export。
+- Ed25519 Keygen、Sign、Verify。
+- Scrypt + AES-256-GCM 私有备份 Create/Inspect/Restore。
+- Character Card V1/V2/V3、PNG 和 CHARX。
+- Adapter List/Show/Doctor 与 persona-builder Skill 安装。
+
+### 原生部署
+
+部署页分别调用 Hermes Profile Distribution 与 OpenClaw Agent/Workspace 引擎，不把它们降级成通用文件复制。
+
+流程：
 
 ```text
-id
-label
-category
-cli_command
-api_route
-web_route
-destructive
-supports_preview
-runs_as_job
-status
+选择 Persona 或 PersonaPack
+→ 读取 Runtime
+→ 生成计划
+→ 显示命令、所有权冲突、保留项和快照
+→ 用户确认
+→ 重新生成并比较计划哈希
+→ Apply
+→ 原生 Verify
+→ 记录或回滚
 ```
 
-CI 必须保证：每个公开 CLI Capability 都有 Web 映射，或有明确的 `web_not_applicable_reason`。
+一次性确认令牌只返回当前页面，数据库仅保存令牌 SHA-256。Runtime、Workspace、所有权或包摘要变化后，旧计划失效。
 
-特殊映射：
+### Memory 与 Session Summary
 
-- `--json` → API 结构化响应
-- `--dry-run` → Plan 页面
-- `--yes` → 一次性确认令牌
-- `--no-browser` → Web 不适用
-- CLI 文本日志 → Job Event
-- 弃用的 `install` → 不单独制作页面，映射到 `deploy`
+- Policy 编辑与验证。
+- 从绑定 Runtime Collect。
+- Pending/Approved/Rejected 队列。
+- Memory 冲突左右对比和显式解决。
+- Plan 和确认后 Apply。
+- Session 手动摘要。
+- 实验性原始 Session 预览需要策略启用和单次 `PREVIEW` 确认，不写入 Registry。
 
-## 5. Revision 与 Diff
+Collect 和 Apply 进入 Job Store；Job 输入不保存原始 Session、摘要正文或聊天证据。
 
-以下操作创建 Revision：手动保存、AI 生成/修改、Character Card 导入、Runtime Adoption、Migration、Backup Restore、PersonaPack Import、历史恢复。
+### AI 人格工作室
 
-Revision 至少记录：
+Provider：
 
-```text
-revision_id
-persona_id
-parent_revision_id
-created_at
-source
-summary
-content_hash
-canonical_snapshot
-validation_result
-test_result
-```
-
-Diff 类型：
-
-- Canonical 语义 Diff
-- 任意 Revision Diff
-- Hermes/OpenClaw 编译产物 Diff
-- 当前 Runtime 与部署计划 Diff
-- PersonaPack Manifest/成员 Diff
-- Memory 冲突 Diff
-- Session Summary 修订 Diff
-
-风险级别：低、中、高、破坏性。Boundary、Critical Behavior、Memory Policy 和所有权变化至少为高风险。
-
-## 6. Job 契约
-
-长任务统一进入 Job Center：发现、接管、构建、打包、签名、备份、恢复、部署、同步、Session、Character Card、AI 生成、批量测试。
-
-状态：
-
-```text
-queued
-running
-waiting-review
-success
-failed
-cancelled
-```
-
-Job 持久化事件、进度、输入摘要、输出、错误和关联 Persona/Runtime。实时更新使用 SSE；刷新页面后仍可继续查看。
-
-## 7. AI 人格工作室
-
-Provider：OpenAI Compatible、OpenAI、Anthropic、Gemini、Ollama/本地模型。
+- OpenAI
+- OpenAI-compatible
+- Anthropic
+- Gemini
+- Ollama
 
 模式：
 
-- Create：自然语言设计新 Persona
-- Distill：从用户显式选择的记录提取人格证据
-- Hybrid：设计要求与聊天证据组合
-- Refine：修改已有 Persona
+- Create
+- Distill
+- Hybrid
+- Refine
 
 固定流程：
 
 ```text
-输入 → 结构化生成 → Schema 校验 → 安全检查 → 场景测试
-→ 语义 Diff → 用户审核 → 创建 Revision
+输入
+→ Provider 结构化生成
+→ Canonical v3 合并与正规化
+→ Schema/项目校验
+→ Scenario Test
+→ Hermes/OpenClaw/Generic 编译预览
+→ 语义 Diff 与风险级别
+→ 用户输入 APPLY
+→ 创建或更新 Revision
 ```
 
-密钥优先保存在系统 Keyring；不可用时进入本地加密 Vault。API 只返回 `secret_ref` 和掩码，不返回 Secret。日志必须过滤 Authorization、API Key 和自定义敏感 Header。
+原始设计描述和聊天证据不写入 Job 或 Generation 数据库，只保存输入哈希、Canonical 草稿、评估结果、Provider/Model 和 Token 使用信息。
 
-## 8. 安全契约
+## Secret Vault
 
-- 非 Loopback 绑定必须鉴权。
-- 浏览器不得读取任意路径；仅允许 Registry、Discovery、配置根目录、Upload、Export、Snapshot、Backup。
-- 所有路径执行 `expanduser`、`resolve`、允许根校验、符号链接和文件类型检查。
-- 部署、接管、恢复、迁移、批量修改、Memory/Session Apply、AI 修改应用、删除操作必须先生成 Plan。
-- Apply 携带 `plan_id`、`plan_hash`、一次性确认令牌；源文件变化后拒绝旧 Plan。
-- 原始 Session 双向同步保持关闭。
-
-## 9. 分阶段交付
-
-### Phase 0：路线与契约
-
-- 本文档
-- Capability、API、Job、Revision 和安全契约
-- 直接主分支提交规则
-
-### Phase 1：SPA 与 API 基础
-
-- 统一 Web Shell、导航、路由和 API Client
-- `/api/v1/meta`、Capability Registry、统一错误模型
-- Job Store、Job API、SSE
-- 旧页面兼容入口
-- 静态资源打包和 Web 基础测试
-
-### Phase 2：Persona 生命周期
-
-- Persona 列表、详情、新建、注册
-- Discovery、Adoption 向导
-- 导入、导出和活动记录
-
-### Phase 3：编辑、Revision、Diff、测试
-
-- 结构化编辑器与源码编辑器
-- Revision Store、恢复、语义 Diff
-- Validate、Scenario Test、Migration、编译预览
-
-### Phase 4：构建、包、信任、备份
-
-- Build、Pack、Inspect、Public Export
-- Keygen、Sign、Verify
-- Backup Create/Inspect/Restore
-- Character Card、Skill、Adapter 管理
-
-### Phase 5：Runtime 与部署
-
-- Hermes/OpenClaw Runtime 详情
-- Local/Docker/SSH
-- Deployment Plan、文件 Diff、Apply、Verify、Rollback、Uninstall
-
-### Phase 6：Memory 与 Session 治理
-
-- Policy、Collect、Review、Conflict、Plan、Apply、History
-- Reviewed Session Summary 完整工作流
-
-### Phase 7：AI 人格工作室
-
-- Provider 与 Secret Vault
-- Create、Distill、Hybrid、Refine
-- Streaming、Structured Output、测试、Diff、Revision 草稿
-
-### Phase 8：一致性、安全和发布
-
-- CLI/Web Capability CI
-- Playwright 和安全回归
-- 性能、可访问性、国际化
-- 独立程序和平台矩阵验收
-
-## 10. 阶段完成标准
-
-每个阶段必须：
-
-1. 代码和文档直接提交到 `main`，提交信息带阶段范围。
-2. 通过现有 pytest、Python Contract 和 Docker Contract。
-3. 新能力有 API 测试；用户工作流有端到端或等效集成测试。
-4. 不破坏 1.0 CLI、Registry Schema v3、PersonaPack v2 和 Adapter API 1.x。
-5. 不引入公网 CDN、明文 Secret、任意 Shell 或任意路径访问。
-6. 更新本文件的执行状态和相关用户文档。
-
-## 11. 最终验收流程
-
-用户无需打开终端即可完成：
+Provider 元数据保存在 `control-plane.db`，只包含 `secret_ref`。API Key 和自定义敏感 Header 整体保存在本地 AES-256-GCM Vault：
 
 ```text
-配置模型 → 创建/导入 Persona → AI 生成或优化 → 编辑 → Diff → 测试
-→ 构建 → 打包 → 签名 → 备份 → 扫描 Runtime → 接管
-→ 查看部署 Diff → 部署/验证 → 审核 Memory/Session → 回滚
+~/.personadock/secrets/master.key
+~/.personadock/secrets/vault.json
 ```
 
-CLI 继续保留，作为自动化、服务器和高级用户接口。
+- 主密钥和密文分离。
+- 文件尽可能设置为 `0600`。
+- Provider API 只返回 `secret_configured`。
+- 删除 Provider 时同时删除对应 Secret。
+- Gemini API Key 通过 Header 发送，不拼进 URL。
+
+## Capability 一致性
+
+`web/parity.py` 直接解析完整 `stable_cli` 顶层命令，并要求每个命令映射到一个或多个现有 Web Capability。新增 CLI 顶层命令但未更新 Web 映射时，CI 会失败。
+
+接口：
+
+```text
+GET /api/v1/capabilities
+GET /api/v1/parity
+GET /api/v1/meta
+```
+
+当前 Capability 状态允许 `ready` 和明确标记的 `legacy`；计划项数量为 0。`install` 和旧 Filesystem `uninstall` 继续作为 1.x 兼容命令，不单独复制为原生 Web 功能。
+
+## Web 安全
+
+- 非 Loopback 绑定必须配置 Bearer Token。
+- Bearer Token 使用恒定时间比较。
+- 默认请求体上限为 24 MiB，可通过 `PERSONADOCK_WEB_MAX_BODY_BYTES` 在 1–128 MiB 范围内调整。
+- API 响应默认 `Cache-Control: no-store`。
+- 启用 CSP、`nosniff`、`DENY` frame、无 Referrer、Permissions Policy 和同源资源策略。
+- 浏览器文件路径限制在 Persona、Upload、Export、Backup、Key 和 Runtime 管理根目录。
+- 上传单文件限制为 16 MiB。
+- API Key、备份密码和部署确认令牌不写入 Job 日志。
+
+## 验收
+
+每阶段及最终主分支均运行：
+
+- 完整 pytest。
+- CLI/Web Capability parity。
+- 安全中间件和请求限制测试。
+- AI Vault、Provider、草稿、Diff 和 Revision 测试。
+- 原生部署 Plan/Apply/Rollback 契约测试。
+- Memory/Session 治理边界测试。
+- 安装脚本语法检查。
+- PyInstaller 独立程序构建与 Web 资源验证。
+- 示例 PersonaPack 构建、检查、校验和与 Artifact 上传。
+
+PersonaDock CLI 继续长期保留，作为自动化、服务器和高级用户接口。
