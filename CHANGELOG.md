@@ -1,5 +1,32 @@
 # Changelog
 
+## Unreleased — Web Control Plane 2
+
+### Complete Web capability coverage
+
+- Unified desktop-style Web workspace with versioned `/api/v1` resources, Capability Registry, persistent Job Center and SSE events.
+- Persona creation, registration, Runtime discovery, Adoption, export, Canonical editing, Revision history, semantic Diff, validation, tests and compile previews.
+- Build, PersonaPack, public export, signing, verification, encrypted backup, Character Card, Adapter and Skill workflows.
+- Native Hermes and OpenClaw deployment Plan/Apply/Verify/Rollback with persistent deployment history and runtime-state revalidation.
+- Memory and Reviewed Session Summary policy, collection, review, conflict, plan and apply workspaces.
+
+### AI Persona Studio
+
+- OpenAI, OpenAI-compatible, Anthropic, Gemini and Ollama Provider adapters.
+- AES-256-GCM local Secret Vault; API keys and custom sensitive headers are not stored in SQLite or returned to the browser.
+- Create, Distill, Hybrid and Refine modes.
+- Canonical v3 validation, scenario tests, compile previews and semantic risk Diff before application.
+- AI results remain drafts until the user explicitly applies them to a Revision; no automatic deployment or synchronization.
+- Raw instructions and evidence are not stored in Job or Generation history.
+
+### Web security and quality
+
+- Constant-time Bearer Token comparison.
+- Configurable request-body limit, API `no-store`, Content Security Policy, frame denial, MIME sniffing protection and restrictive browser permissions.
+- Automatic CLI/Web top-level command parity validation with zero planned Capability entries.
+- Phase-specific integration tests, standalone executable resource validation and retained pytest diagnostics in GitHub Actions.
+- Restrained desktop utility styling with no gradients, AI chat bubbles or CDN dependencies.
+
 ## 1.0.0 — 2026-07-24
 
 PersonaDock 1.0 turns the project into a local-first control plane for portable, reviewable AI personas.
