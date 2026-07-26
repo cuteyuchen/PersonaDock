@@ -56,13 +56,20 @@ def register_governance_routes(
     require_token: Callable[..., None],
     registry_factory: Callable[[], Any],
     job_store_factory: Callable[[], JobStore] = _jobs,
+    sync_engine_factory: Callable[[], Any] | None = None,
+    session_engine_factory: Callable[[], Any] | None = None,
 ) -> None:
+    resolve_sync = sync_engine_factory or (lambda: SyncEngine(registry_factory()))
+    resolve_sessions = session_engine_factory or (
+        lambda: SessionSummaryEngine(registry_factory())
+    )
+
     @app.post("/api/v1/governance/memory/{persona_id}/collect")
     def collect_memory(
         persona_id: str,
         _: None = Depends(require_token),
     ) -> dict[str, Any]:
-        engine = SyncEngine(registry_factory())
+        engine = resolve_sync()
         try:
             return _run_job(
                 job_store_factory(),
@@ -82,8 +89,11 @@ def register_governance_routes(
         _: None = Depends(require_token),
     ) -> dict[str, Any]:
         if not request.confirmed:
-            raise HTTPException(status_code=400, detail="Memory apply requires explicit confirmation")
-        engine = SyncEngine(registry_factory())
+            raise HTTPException(
+                status_code=400,
+                detail="Memory apply requires explicit confirmation",
+            )
+        engine = resolve_sync()
         try:
             return _run_job(
                 job_store_factory(),
@@ -107,7 +117,7 @@ def register_governance_routes(
         persona_id: str,
         _: None = Depends(require_token),
     ) -> dict[str, Any]:
-        engine = SessionSummaryEngine(registry_factory())
+        engine = resolve_sessions()
         try:
             return _run_job(
                 job_store_factory(),
@@ -127,8 +137,11 @@ def register_governance_routes(
         _: None = Depends(require_token),
     ) -> dict[str, Any]:
         if not request.confirmed:
-            raise HTTPException(status_code=400, detail="Session Summary apply requires explicit confirmation")
-        engine = SessionSummaryEngine(registry_factory())
+            raise HTTPException(
+                status_code=400,
+                detail="Session Summary apply requires explicit confirmation",
+            )
+        engine = resolve_sessions()
         try:
             return _run_job(
                 job_store_factory(),
