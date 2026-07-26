@@ -64,7 +64,8 @@ def test_build_pack_sign_and_verify_workflow(tmp_path: Path) -> None:
     packed = service.pack("xiaoyou", targets=["hermes", "openclaw"])
     package = Path(packed["path"])
     assert package.is_file()
-    assert packed["manifest"]["valid"] is True
+    assert packed["manifest"]["integrity"] == "ok"
+    assert packed["manifest"]["integrity_errors"] == []
 
     key = service.create_key("release")
     assert "private_key" not in key
@@ -77,8 +78,9 @@ def test_build_pack_sign_and_verify_workflow(tmp_path: Path) -> None:
         signature_path=signature["signature"],
         trust_local_keys=True,
     )
-    assert verified["valid"] is True
-    assert verified["signature_valid"] is True
+    assert verified["integrity"] == "ok"
+    assert verified["compatibility"] == "compatible"
+    assert verified["signature"] == "valid-trusted"
     assert verified["trusted"] is True
 
 
