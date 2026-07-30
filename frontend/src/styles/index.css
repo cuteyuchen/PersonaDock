@@ -1,0 +1,116 @@
+@import "tailwindcss";
+
+@custom-variant dark (&:is(.dark *));
+
+:root {
+  --background: oklch(0.975 0.004 80);
+  --foreground: oklch(0.215 0.01 285);
+  --card: oklch(0.995 0.002 80);
+  --card-foreground: oklch(0.215 0.01 285);
+  --popover: oklch(0.995 0.002 80);
+  --popover-foreground: oklch(0.215 0.01 285);
+  --primary: oklch(0.285 0.018 280);
+  --primary-foreground: oklch(0.985 0.002 80);
+  --secondary: oklch(0.935 0.006 80);
+  --secondary-foreground: oklch(0.265 0.012 280);
+  --muted: oklch(0.945 0.005 80);
+  --muted-foreground: oklch(0.505 0.014 280);
+  --accent: oklch(0.92 0.014 75);
+  --accent-foreground: oklch(0.255 0.014 280);
+  --destructive: oklch(0.57 0.21 27);
+  --destructive-foreground: oklch(0.985 0 0);
+  --border: oklch(0.875 0.008 80);
+  --input: oklch(0.875 0.008 80);
+  --ring: oklch(0.55 0.04 270);
+  --radius: 0.375rem;
+  --sidebar: oklch(0.205 0.012 285);
+  --sidebar-foreground: oklch(0.91 0.006 80);
+  --sidebar-muted: oklch(0.285 0.014 285);
+  --sidebar-border: oklch(0.31 0.012 285);
+}
+
+.dark {
+  --background: oklch(0.19 0.01 285);
+  --foreground: oklch(0.925 0.004 80);
+  --card: oklch(0.225 0.012 285);
+  --card-foreground: oklch(0.925 0.004 80);
+  --popover: oklch(0.225 0.012 285);
+  --popover-foreground: oklch(0.925 0.004 80);
+  --primary: oklch(0.88 0.008 80);
+  --primary-foreground: oklch(0.22 0.012 285);
+  --secondary: oklch(0.29 0.012 285);
+  --secondary-foreground: oklch(0.925 0.004 80);
+  --muted: oklch(0.285 0.012 285);
+  --muted-foreground: oklch(0.69 0.012 280);
+  --accent: oklch(0.31 0.015 275);
+  --accent-foreground: oklch(0.94 0.004 80);
+  --border: oklch(0.345 0.012 285);
+  --input: oklch(0.345 0.012 285);
+  --ring: oklch(0.66 0.035 270);
+  --sidebar: oklch(0.16 0.01 285);
+  --sidebar-foreground: oklch(0.91 0.006 80);
+  --sidebar-muted: oklch(0.25 0.012 285);
+  --sidebar-border: oklch(0.285 0.012 285);
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --radius-sm: calc(var(--radius) - 2px);
+  --radius-md: var(--radius);
+  --radius-lg: calc(var(--radius) + 2px);
+}
+
+* {
+  border-color: var(--border);
+}
+
+html,
+body,
+#app {
+  min-height: 100%;
+}
+
+body {
+  margin: 0;
+  background: var(--background);
+  color: var(--foreground);
+  font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  font-size: 14px;
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+}
+
+button,
+input,
+select,
+textarea {
+  font: inherit;
+}
+
+code,
+pre,
+.font-mono {
+  font-family: "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+}
+
+::selection {
+  background: oklch(0.77 0.04 75 / 0.55);
+}
