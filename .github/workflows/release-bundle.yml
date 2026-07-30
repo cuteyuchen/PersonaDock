@@ -136,6 +136,23 @@ jobs:
           python -m pip install -e .[dev]
           python -m pip install pyinstaller
 
+      - name: Install Playwright Chromium
+        run: pnpm --dir frontend exec playwright install --with-deps chromium
+
+      - name: Run Vue browser E2E
+        run: pnpm --dir frontend test:e2e
+
+      - name: Upload Playwright diagnostics
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-${{ github.sha }}
+          path: |
+            frontend/playwright-report/
+            frontend/test-results/
+          if-no-files-found: ignore
+          retention-days: 7
+
       - name: Run tests
         shell: bash
         run: |
@@ -211,7 +228,7 @@ jobs:
             "repos/${GITHUB_REPOSITORY}/statuses/${GITHUB_SHA}" \
             -f state=success \
             -f context=personadock-bundle \
-            -f description='Vue frontend and standalone PersonaDock bundle uploaded successfully' \
+            -f description='Vue frontend, Playwright E2E and standalone PersonaDock bundle succeeded' \
             -f target_url="${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}"
 
       - name: Mark bundle failed
