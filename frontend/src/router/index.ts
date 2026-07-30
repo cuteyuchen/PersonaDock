@@ -1,8 +1,15 @@
 import { createRouter, createWebHashHistory, type RouteRecordRaw } from 'vue-router'
 
 import DashboardView from '@/views/DashboardView.vue'
+import DiffCenterView from '@/views/DiffCenterView.vue'
 import JobsView from '@/views/JobsView.vue'
+import PersonaCreateView from '@/views/PersonaCreateView.vue'
+import PersonaDetailView from '@/views/PersonaDetailView.vue'
+import PersonaEditorView from '@/views/PersonaEditorView.vue'
+import PersonaRegisterView from '@/views/PersonaRegisterView.vue'
+import PersonaRevisionsView from '@/views/PersonaRevisionsView.vue'
 import PersonasView from '@/views/PersonasView.vue'
+import PersonaTestsView from '@/views/PersonaTestsView.vue'
 import PlaceholderView from '@/views/PlaceholderView.vue'
 import RuntimesView from '@/views/RuntimesView.vue'
 import SettingsView from '@/views/SettingsView.vue'
@@ -11,11 +18,17 @@ const routes: RouteRecordRaw[] = [
   { path: '/', redirect: '/overview' },
   { path: '/overview', name: 'overview', component: DashboardView, meta: { title: '概览' } },
   { path: '/personas', name: 'personas', component: PersonasView, meta: { title: '人格' } },
+  { path: '/personas/new', name: 'persona-create', component: PersonaCreateView, meta: { title: '新建 Persona' } },
+  { path: '/personas/register', name: 'persona-register', component: PersonaRegisterView, meta: { title: '注册 Persona' } },
+  { path: '/personas/:personaId', name: 'persona-detail', component: PersonaDetailView, meta: { title: 'Persona 详情', personaTab: 'overview' } },
+  { path: '/personas/:personaId/editor', name: 'persona-editor', component: PersonaEditorView, meta: { title: 'Canonical 编辑', personaTab: 'editor' } },
+  { path: '/personas/:personaId/revisions', name: 'persona-revisions', component: PersonaRevisionsView, meta: { title: 'Revision 与 Diff', personaTab: 'revisions' } },
+  { path: '/personas/:personaId/tests', name: 'persona-tests', component: PersonaTestsView, meta: { title: '验证与测试', personaTab: 'tests' } },
+  { path: '/diff', name: 'diff', component: DiffCenterView, meta: { title: '差异中心' } },
   { path: '/runtimes', name: 'runtimes', component: RuntimesView, meta: { title: '运行实例' } },
   { path: '/jobs', name: 'jobs', component: JobsView, meta: { title: '任务中心' } },
   { path: '/settings', name: 'settings', component: SettingsView, meta: { title: '系统设置' } },
   { path: '/ai-studio', name: 'ai-studio', component: PlaceholderView, meta: { title: 'AI 人格工作室', legacyHash: '#/ai-studio' } },
-  { path: '/diff', name: 'diff', component: PlaceholderView, meta: { title: '差异中心', legacyHash: '#/diff' } },
   { path: '/deployments', name: 'deployments', component: PlaceholderView, meta: { title: '部署', legacyHash: '#/deployments' } },
   { path: '/memory', name: 'memory', component: PlaceholderView, meta: { title: 'Memory 同步', legacyHash: '#/memory' } },
   { path: '/sessions', name: 'sessions', component: PlaceholderView, meta: { title: 'Session Summary', legacyHash: '#/sessions' } },
