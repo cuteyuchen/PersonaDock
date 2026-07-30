@@ -16,8 +16,10 @@
 - Reka UI
 - Tailwind CSS 4
 - Lucide Vue
+- VeeValidate + Zod
+- Monaco Editor
 - Vitest
-- 后续阶段加入 Playwright 与 Monaco Editor
+- 后续阶段加入 Playwright
 
 Node.js 仅用于开发和发布构建。Vite 产物写入：
 
@@ -52,14 +54,26 @@ src/persona_dock/web/static/vue/
 |---|---|---|
 | Vue Phase 0 | 已完成 | 工程、Vite、TypeScript、Tailwind 4、shadcn-vue、CI 构建链 |
 | Vue Phase 1 | 已完成 | App Shell、Dashboard、Persona 列表、Runtime 列表、Job Center、Settings |
-| Vue Phase 2 | 下一阶段 | Persona 新建/注册/详情、Canonical Editor、Revision、Diff、Test |
-| Vue Phase 3 | 未开始 | Build、Pack、Trust、Backup、Character Card、Adapter、Skill |
+| Vue Phase 2 | 已完成 | Persona 新建/注册/详情、Canonical/Monaco Editor、Revision、Diff、Validation、Scenario Test、Compile Preview、Migration |
+| Vue Phase 3 | 下一阶段 | Build、Pack、Trust、Backup、Character Card、Adapter、Skill |
 | Vue Phase 4 | 未开始 | Adoption、Deployment Plan/Apply/Rollback、Runtime 详情 |
 | Vue Phase 5 | 未开始 | Memory 与 Session Summary 治理 |
 | Vue Phase 6 | 未开始 | AI Studio 与 Provider Settings |
 | Vue Phase 7 | 未开始 | Playwright、可访问性、性能、切换根入口、删除旧前端 |
 
-Vue Phase 0–1 已通过主分支 bundle `30555536141`：Node/pnpm、TypeScript、Vitest、Vite、完整 pytest、安装脚本、PyInstaller、Vue HTTP 资源验证、PersonaPack 与发布 Artifact 全部成功。
+Vue Phase 0–1 通过主分支 bundle `30555536141`。Vue Phase 2 通过主分支 bundle `30558275349`：Node/pnpm、TypeScript、Vitest、Vite、139 项 pytest、安装脚本、PyInstaller、Vue HTTP 资源验证、PersonaPack 与发布 Artifact 全部成功。
+
+## Vue Phase 2 实施结果
+
+- 新建 Persona：VeeValidate + Zod 校验 ID、Locale 和安全相对目录。
+- 注册工程：显示允许根目录并复用后端真实路径限制。
+- Persona 详情：工程元数据、Schema、绑定、部署与同步概览。
+- Canonical 编辑：结构化字段和 Monaco JSON 共用完整 Canonical v3 模型。
+- 保存：校验、场景测试、语义 Diff、Revision 与 Journal 一次完成。
+- 并发保护：Vue 提交携带 `expected_content_hash`；工程变化后旧草稿返回 409，不静默覆盖。
+- Revision：历史列表、任意版本 Diff、风险摘要、恢复预览和 Plan Hash 恢复。
+- Quality Gate：项目校验、场景测试、编译预算和 Schema v3 迁移预览/应用。
+- 全局 Diff Center：按 Persona 和 Revision 比较 Canonical 语义变化。
 
 ## 当前入口
 
@@ -74,7 +88,7 @@ GET /assets/vue/app.css
 ```json
 {
   "web_frontend": "vue3-shadcn-vue",
-  "web_frontend_migration_phase": 1,
+  "web_frontend_migration_phase": 2,
   "vue_preview": "/vue"
 }
 ```
