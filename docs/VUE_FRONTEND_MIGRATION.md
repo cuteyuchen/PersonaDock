@@ -1,7 +1,7 @@
 # PersonaDock Vue 3 前端迁移
 
-状态：执行中  
-目标：用 Vue 3、TypeScript、Vite 和 shadcn-vue 替换 Web Control Plane 2 的原生 JavaScript 前端。  
+状态：功能迁移完成，进入稳定维护  
+目标：用 Vue 3、TypeScript、Vite 和 shadcn-vue 替换 Web Control Plane 2 的原生 JavaScript 主界面。  
 原则：后端 `/api/v1`、Capability、Plan/Apply、Revision、Job 和安全契约保持不变。
 
 ## 技术栈
@@ -12,22 +12,21 @@
 - Vue Router Hash History
 - Pinia
 - TanStack Vue Query
-- shadcn-vue 源码组件
-- Reka UI
+- shadcn-vue 源码组件与 Reka UI
 - Tailwind CSS 4
 - Lucide Vue
 - VeeValidate + Zod
 - Monaco Editor
-- Vitest
-- 后续阶段加入 Playwright
+- Vitest + Vue Test Utils
+- Playwright + axe-core
 
-Node.js 仅用于开发和发布构建。Vite 产物写入：
+Node.js 只用于开发、测试和发布构建。Vite 产物写入：
 
 ```text
 src/persona_dock/web/static/vue/
 ```
 
-最终 wheel 和 PyInstaller 独立程序继续不依赖 Node.js。
+最终 wheel 与 PyInstaller 独立程序不依赖 Node.js。
 
 ## 视觉约束
 
@@ -36,62 +35,84 @@ src/persona_dock/web/static/vue/
 - 低圆角、高信息密度。
 - 表格、Diff、窄表单和日志优先。
 - 不使用渐变、发光、紫色 AI 模板和大面积营销卡片。
-- AI Studio 保持“参数 → 审查 → 应用”结构，不使用聊天气泡。
+- AI Studio 保持“参数 → 审查 → 应用”，不使用聊天气泡。
 
-## 迁移策略
+## 最终入口
 
-迁移期间：
+```text
+GET /                  # Vue 主控制面
+GET /vue               # Vue 兼容别名
+GET /legacy            # 原生界面，一个兼容周期
+GET /assets/vue/app.js
+GET /assets/vue/app.css
+```
 
-- 当前稳定原生界面继续位于 `/`。
-- Vue 预览入口位于 `/vue`。
-- 已迁移页面直接使用现有 API。
-- 未迁移的高风险写操作明确跳转到兼容界面，不制作不完整副本。
-- Vue 页面通过类型检查、单元测试、Python 契约和独立程序验证后，才替换根入口。
+健康检查与 `/api/v1/meta` 返回：
 
-## 阶段
+```json
+{
+  "web_frontend": "vue3-shadcn-vue",
+  "web_frontend_migration_phase": 7,
+  "vue_preview": "/vue"
+}
+```
+
+## 阶段结果
 
 | 阶段 | 状态 | 内容 |
 |---|---|---|
 | Vue Phase 0 | 已完成 | 工程、Vite、TypeScript、Tailwind 4、shadcn-vue、CI 构建链 |
 | Vue Phase 1 | 已完成 | App Shell、Dashboard、Persona 列表、Runtime 列表、Job Center、Settings |
-| Vue Phase 2 | 已完成 | Persona 新建/注册/详情、Canonical/Monaco Editor、Revision、Diff、Validation、Scenario Test、Compile Preview、Migration |
-| Vue Phase 3 | 下一阶段 | Build、Pack、Trust、Backup、Character Card、Adapter、Skill |
-| Vue Phase 4 | 未开始 | Adoption、Deployment Plan/Apply/Rollback、Runtime 详情 |
-| Vue Phase 5 | 未开始 | Memory 与 Session Summary 治理 |
-| Vue Phase 6 | 未开始 | AI Studio 与 Provider Settings |
-| Vue Phase 7 | 未开始 | Playwright、可访问性、性能、切换根入口、删除旧前端 |
+| Vue Phase 2 | 已完成 | Persona 生命周期、Canonical/Monaco、Revision、Diff、Validation、Scenario Test、Compile Preview、Migration |
+| Vue Phase 3 | 已完成 | Build、Pack、Trust、Backup、Character Card、Adapter、Skill |
+| Vue Phase 4 | 已完成 | Adoption、Runtime 详情、Deployment Plan/Apply/Rollback |
+| Vue Phase 5 | 已完成 | Memory 与 Session Summary Policy、Review、Conflict、Plan/Apply 与历史 |
+| Vue Phase 6 | 已完成 | AI Studio、Provider Vault、Create/Distill/Hybrid/Refine 与显式 APPLY |
+| Vue Phase 7 | 已完成 | Playwright、axe-core、性能预算、根入口切换与 `/legacy` 兼容入口 |
 
-Vue Phase 0–1 通过主分支 bundle `30555536141`。Vue Phase 2 通过主分支 bundle `30558275349`：Node/pnpm、TypeScript、Vitest、Vite、139 项 pytest、安装脚本、PyInstaller、Vue HTTP 资源验证、PersonaPack 与发布 Artifact 全部成功。
+## 核心实现
 
-## Vue Phase 2 实施结果
+### Persona 与编辑
 
-- 新建 Persona：VeeValidate + Zod 校验 ID、Locale 和安全相对目录。
-- 注册工程：显示允许根目录并复用后端真实路径限制。
-- Persona 详情：工程元数据、Schema、绑定、部署与同步概览。
-- Canonical 编辑：结构化字段和 Monaco JSON 共用完整 Canonical v3 模型。
-- 保存：校验、场景测试、语义 Diff、Revision 与 Journal 一次完成。
-- 并发保护：Vue 提交携带 `expected_content_hash`；工程变化后旧草稿返回 409，不静默覆盖。
-- Revision：历史列表、任意版本 Diff、风险摘要、恢复预览和 Plan Hash 恢复。
-- Quality Gate：项目校验、场景测试、编译预算和 Schema v3 迁移预览/应用。
-- 全局 Diff Center：按 Persona 和 Revision 比较 Canonical 语义变化。
+- 新建、注册和安全 Persona Root 限制。
+- 结构化字段与 Monaco JSON 共用完整 Canonical v3 模型。
+- 保存自动完成校验、场景测试、语义 Diff、Revision 与 Journal。
+- Vue 提交携带 `expected_content_hash`，陈旧草稿返回 409。
+- Revision 恢复必须先生成 Preview，并使用 Plan Hash 应用。
 
-## 当前入口
+### Artifact、信任与兼容
 
-```text
-GET /vue
-GET /assets/vue/app.js
-GET /assets/vue/app.css
-```
+- 构建目标产物、PersonaPack 与公开工程导出。
+- Manifest 检查、Ed25519 密钥、签名与验证。
+- AES-256-GCM 私有备份创建、检查和恢复；密码不进入 Job。
+- Character Card v2/v3、PNG 与 CHARX 检查、导入和导出。
+- Adapter Doctor 与 persona-builder Skill Plan/Install。
 
-健康检查和 `/api/v1/meta` 返回：
+### Runtime 与部署
 
-```json
-{
-  "web_frontend": "vue3-shadcn-vue",
-  "web_frontend_migration_phase": 2,
-  "vue_preview": "/vue"
-}
-```
+- Runtime 能力、元数据和 Managed 状态详情。
+- Adoption Preview 与显式接管。
+- Hermes Profile 和 OpenClaw Agent/Workspace 原生部署表单。
+- 一次性确认令牌不写入 Job；Apply 前重新计算语义计划。
+- 部署历史、详情和显式 Rollback。
+
+### Memory 与 Session Summary
+
+- Policy JSON、候选收集、敏感性与同步范围审核。
+- Memory 冲突支持 keep-existing、replace、keep-both。
+- Plan、传播历史和显式 Apply。
+- Session Summary 支持手工脱敏摘要、审核和传播。
+- 原始 Session 或 Transcript 不进入共享同步链路。
+
+### AI Studio
+
+- OpenAI、OpenAI-compatible、Anthropic、Gemini 与 Ollama Provider。
+- Secret 只写入本地 AES-256-GCM Vault，API 不回显。
+- Provider 测试和模型列表。
+- Create、Distill、Hybrid 与 Refine。
+- Job 只记录输入哈希，不保存 instruction/evidence 原文。
+- 审查 Canonical、semantic diff、risk、validation、tests 与 compile preview。
+- APPLY 前检查 Refine base Revision，过期草稿被拒绝。
 
 ## CI 验收
 
@@ -100,20 +121,15 @@ GET /assets/vue/app.css
 1. Node 22 与 pnpm 安装。
 2. Vue TypeScript 检查。
 3. Vitest。
-4. Vite 构建。
-5. 检查 `index.html`、`app.js` 和 `app.css`。
-6. 完整 pytest。
-7. 安装脚本检查。
-8. PyInstaller 构建。
-9. 启动独立程序并通过 HTTP 验证 `/vue` 与静态资源。
-10. PersonaPack 和发布产物验收。
+4. Vite 构建及静态资源检查。
+5. Playwright Chromium 浏览器流程。
+6. axe-core 严重级可访问性检查。
+7. 前端静态资源 8 MiB 发布预算。
+8. 完整 pytest。
+9. 安装脚本检查。
+10. PyInstaller 构建与真实 HTTP 资源验证。
+11. PersonaPack、校验和与发布 Artifact 验收。
 
-## 切换根入口的条件
+## 兼容期
 
-只有同时满足以下条件，`/` 才从原生前端切换到 Vue：
-
-- 所有 Capability 均有 Vue 页面或明确的兼容例外。
-- 高风险写操作继续遵循 Plan → Review → Apply。
-- AI、部署、恢复、Memory 和 Session 的浏览器 E2E 通过。
-- 独立程序中 Vue 资源验证通过。
-- 旧页面迁移到 `/legacy/*` 后仍可在一个兼容周期内访问。
+原生界面不再是默认入口，只通过 `/legacy` 提供一个兼容周期。它继续共用相同 API 和 Registry，不形成第二套领域状态。兼容期结束后可以删除原生 HTML、CSS 和 JavaScript，但不得删除稳定 API 或 1.0 数据兼容能力。
