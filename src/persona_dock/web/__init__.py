@@ -26,7 +26,13 @@ from .session_api import register_session_routes
 from .sync_api import register_sync_routes
 from .v1_api import register_v1_routes
 from .v3_api import register_v3_routes
-from .version import WEB_CONTROL_PLANE_VERSION, WEB_REFACTOR_PHASE
+from .version import (
+    WEB_CONTROL_PLANE_VERSION,
+    WEB_FRONTEND,
+    WEB_FRONTEND_MIGRATION_PHASE,
+    WEB_REFACTOR_PHASE,
+)
+from .vue_assets import register_vue_asset_routes
 
 
 def create_app(token: str | None = None):
@@ -58,6 +64,9 @@ def create_app(token: str | None = None):
             "phase": 8,
             "web_control_plane": WEB_CONTROL_PLANE_VERSION,
             "web_refactor_phase": WEB_REFACTOR_PHASE,
+            "web_frontend": WEB_FRONTEND,
+            "web_frontend_migration_phase": WEB_FRONTEND_MIGRATION_PHASE,
+            "vue_preview": "/vue",
             "control_plane": "local",
             "registry": RegistryService().summary(),
             "canonical_schema": 3,
@@ -77,6 +86,7 @@ def create_app(token: str | None = None):
         }
 
     register_phase_asset_routes(app)
+    register_vue_asset_routes(app)
     register_v1_routes(app, require_token, RegistryService)
     register_lifecycle_routes(app, require_token, RegistryService)
     register_editor_routes(app, require_token, RegistryService)
@@ -122,6 +132,7 @@ def run_server(
         threading.Timer(0.8, lambda: webbrowser.open(url)).start()
 
     print(f"PersonaDock Web {WEB_CONTROL_PLANE_VERSION}.0 control plane: {url}")
+    print(f"Vue 3 + shadcn-vue preview: {url}/vue")
     print(f"Canonical Persona editor: {url}/canonical")
     print(f"Hermes native Profile manager: {url}/hermes")
     print(f"OpenClaw native Agent manager: {url}/openclaw")
