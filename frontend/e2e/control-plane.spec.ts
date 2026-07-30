@@ -8,7 +8,7 @@ test('Vue control plane owns the root entry and keeps legacy compatibility', asy
   await expect(page.getByRole('navigation')).toBeVisible()
   await page.getByRole('link', { name: '人格', exact: true }).click()
   await expect(page).toHaveURL(/#\/personas$/)
-  await expect(page.getByRole('heading', { name: '人格' })).toBeVisible()
+  await expect(page.getByRole('main').getByRole('heading', { name: '人格' }).first()).toBeVisible()
 
   const legacy = await page.request.get('/legacy')
   expect(legacy.ok()).toBeTruthy()
@@ -44,5 +44,5 @@ test('embedded frontend stays within the release size budget', async ({ request 
   expect(meta.ok()).toBeTruthy()
   const bytes = (await script.body()).byteLength + (await style.body()).byteLength
   expect(bytes).toBeLessThan(8 * 1024 * 1024)
-  expect((await meta.json()).web_frontend_migration_phase).toBe(7)
+  expect((await meta.json()).frontend_migration_phase).toBe(7)
 })
