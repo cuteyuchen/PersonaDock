@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { useMutation, useQuery, useQueryClient } from '@tanstack/vue-query'
 import { Radar } from 'lucide-vue-next'
+import { RouterLink } from 'vue-router'
 
 import { api } from '@/api/client'
 import type { RuntimeInstance } from '@/api/types'
@@ -32,7 +33,7 @@ function formatDate(value: string): string {
 </script>
 
 <template>
-  <PageHeader eyebrow="Runtime Discovery" title="运行实例" description="查看 Hermes Profile 与 OpenClaw Agent/Workspace。接管向导迁移完成前继续从兼容界面进入。">
+  <PageHeader eyebrow="Runtime Discovery" title="运行实例" description="查看 Hermes Profile 与 OpenClaw Agent/Workspace，进入详情检查能力、元数据与接管计划。">
     <template #actions>
       <Button variant="outline" :disabled="isFetching" @click="refetch()">刷新</Button>
       <Button :disabled="isDiscovering" @click="mutate()">
@@ -61,7 +62,7 @@ function formatDate(value: string): string {
               <td class="px-3 py-3"><StatusBadge :status="instance.managed ? 'managed' : 'unmanaged'" :label="instance.managed ? '已管理' : '未管理'" /></td>
               <td class="max-w-[420px] truncate px-3 py-3 font-mono text-[10px] text-muted-foreground">{{ instance.location }}</td>
               <td class="px-3 py-3 text-muted-foreground">{{ formatDate(instance.last_seen_at) }}</td>
-              <td class="px-3 py-3 text-right"><a v-if="!instance.managed" href="/#/runtimes" class="font-medium hover:underline">接管预览</a><span v-else class="text-muted-foreground">—</span></td>
+              <td class="px-3 py-3 text-right"><RouterLink :to="`/runtimes/${encodeURIComponent(instance.id)}`" class="font-medium hover:underline">{{ instance.managed ? '查看' : '接管预览' }}</RouterLink></td>
             </tr>
             <tr v-if="(data ?? []).length === 0"><td colspan="7" class="px-4 py-10 text-center text-muted-foreground">尚未发现运行实例</td></tr>
           </tbody>
