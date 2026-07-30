@@ -1,5 +1,6 @@
 import { createRouter, createWebHashHistory, type RouteRecordRaw } from 'vue-router'
 
+import ArtifactWorkspaceView from '@/views/ArtifactWorkspaceView.vue'
 import DashboardView from '@/views/DashboardView.vue'
 import DiffCenterView from '@/views/DiffCenterView.vue'
 import JobsView from '@/views/JobsView.vue'
@@ -32,10 +33,10 @@ const routes: RouteRecordRaw[] = [
   { path: '/deployments', name: 'deployments', component: PlaceholderView, meta: { title: '部署', legacyHash: '#/deployments' } },
   { path: '/memory', name: 'memory', component: PlaceholderView, meta: { title: 'Memory 同步', legacyHash: '#/memory' } },
   { path: '/sessions', name: 'sessions', component: PlaceholderView, meta: { title: 'Session Summary', legacyHash: '#/sessions' } },
-  { path: '/packages', name: 'packages', component: PlaceholderView, meta: { title: 'PersonaPack 与信任', legacyHash: '#/packages' } },
-  { path: '/backups', name: 'backups', component: PlaceholderView, meta: { title: '备份', legacyHash: '#/backups' } },
-  { path: '/character-cards', name: 'character-cards', component: PlaceholderView, meta: { title: 'Character Card', legacyHash: '#/character-cards' } },
-  { path: '/adapters', name: 'adapters', component: PlaceholderView, meta: { title: 'Adapter 与 Skill', legacyHash: '#/adapters' } },
+  { path: '/packages', name: 'packages', component: ArtifactWorkspaceView, meta: { title: 'PersonaPack 与信任', workspace: 'packages' } },
+  { path: '/backups', name: 'backups', component: ArtifactWorkspaceView, meta: { title: '备份', workspace: 'backups' } },
+  { path: '/character-cards', name: 'character-cards', component: ArtifactWorkspaceView, meta: { title: 'Character Card', workspace: 'character-cards' } },
+  { path: '/adapters', name: 'adapters', component: ArtifactWorkspaceView, meta: { title: 'Adapter 与 Skill', workspace: 'adapters' } },
 ]
 
 export const router = createRouter({
