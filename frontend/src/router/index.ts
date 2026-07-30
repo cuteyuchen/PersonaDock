@@ -1,5 +1,6 @@
 import { createRouter, createWebHashHistory, type RouteRecordRaw } from 'vue-router'
 
+import AIStudioView from '@/views/AIStudioView.vue'
 import ArtifactWorkspaceView from '@/views/ArtifactWorkspaceView.vue'
 import DashboardView from '@/views/DashboardView.vue'
 import DeploymentWorkspaceView from '@/views/DeploymentWorkspaceView.vue'
@@ -13,7 +14,6 @@ import PersonaRegisterView from '@/views/PersonaRegisterView.vue'
 import PersonaRevisionsView from '@/views/PersonaRevisionsView.vue'
 import PersonasView from '@/views/PersonasView.vue'
 import PersonaTestsView from '@/views/PersonaTestsView.vue'
-import PlaceholderView from '@/views/PlaceholderView.vue'
 import RuntimesView from '@/views/RuntimesView.vue'
 import SettingsView from '@/views/SettingsView.vue'
 
@@ -33,9 +33,10 @@ const routes: RouteRecordRaw[] = [
   { path: '/deployments', name: 'deployments', component: DeploymentWorkspaceView, meta: { title: '部署', workspace: 'deployments' } },
   { path: '/memory', name: 'memory', component: GovernanceWorkspaceView, meta: { title: 'Memory 同步', workspace: 'memory' } },
   { path: '/sessions', name: 'sessions', component: GovernanceWorkspaceView, meta: { title: 'Session Summary', workspace: 'sessions' } },
+  { path: '/ai-studio', name: 'ai-studio', component: AIStudioView, meta: { title: 'AI 人格工作室', workspace: 'ai-studio' } },
   { path: '/jobs', name: 'jobs', component: JobsView, meta: { title: '任务中心' } },
   { path: '/settings', name: 'settings', component: SettingsView, meta: { title: '系统设置' } },
-  { path: '/ai-studio', name: 'ai-studio', component: PlaceholderView, meta: { title: 'AI 人格工作室', legacyHash: '#/ai-studio' } },
+  { path: '/settings/providers', name: 'provider-settings', component: AIStudioView, meta: { title: 'AI Provider 设置', workspace: 'providers' } },
   { path: '/packages', name: 'packages', component: ArtifactWorkspaceView, meta: { title: 'PersonaPack 与信任', workspace: 'packages' } },
   { path: '/backups', name: 'backups', component: ArtifactWorkspaceView, meta: { title: '备份', workspace: 'backups' } },
   { path: '/character-cards', name: 'character-cards', component: ArtifactWorkspaceView, meta: { title: 'Character Card', workspace: 'character-cards' } },
