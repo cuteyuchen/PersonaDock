@@ -6,6 +6,7 @@
 
 - [控制平面总览](control-plane.md)：当前架构、数据边界、主要工作流和 Web 页面。
 - [Web Control Plane 2.0](WEB_REFACTOR_PLAN.md)：网页端完整能力、AI Studio、安全边界、阶段实现与验收。
+- [Vue 3 前端迁移](VUE_FRONTEND_MIGRATION.md)：Vue、TypeScript、Vite、shadcn-vue、并行入口和迁移阶段。
 - [阶段与稳定契约](PHASE_STATUS.md)：核心 Phase 0–8 的最终合并状态以及 1.0 兼容边界。
 - [迁移与回滚](migration-and-rollback.md)：应用、Registry、Persona、Hermes/OpenClaw、Memory 与 Session Summary 的恢复流程。
 - [维护审计](maintenance-audit.md)：分支、废弃代码、历史文档和兼容入口的清理结论。
@@ -42,7 +43,7 @@ PersonaDock 不同步原始 Session 或 Transcript。只有经过过滤、脱敏
 - [版本历史](releases.md)
 - [历史重构路线](REFACTOR_PLAN.md)
 
-`REFACTOR_PLAN.md` 是核心 Phase 0–8 的历史设计记录。当前核心稳定状态以 `PHASE_STATUS.md` 为准；Web 2.0 状态以 `WEB_REFACTOR_PLAN.md` 为准。
+`REFACTOR_PLAN.md` 是核心 Phase 0–8 的历史设计记录。当前核心稳定状态以 `PHASE_STATUS.md` 为准；Web 2.0 状态以 `WEB_REFACTOR_PLAN.md` 为准；前端框架迁移状态以 `VUE_FRONTEND_MIGRATION.md` 为准。
 
 ## 文档维护规则
 
@@ -51,4 +52,5 @@ PersonaDock 不同步原始 Session 或 Transcript。只有经过过滤、脱敏
 3. Phase 标题可以保留功能来源，但不得把已经完成的后续阶段写成“未实现”。
 4. Schema、Manifest、Adapter API 或 Registry Schema 发生变化时，同步更新 `compatibility.md`、`PHASE_STATUS.md` 和 `CHANGELOG.md`。
 5. Web Capability、CLI 顶层命令或安全边界发生变化时，同步更新 `WEB_REFACTOR_PLAN.md`。
-6. 发布命令、平台矩阵和资产名称必须与 GitHub Actions 工作流保持一致。
+6. Vue 页面、前端构建链或根入口切换状态发生变化时，同步更新 `VUE_FRONTEND_MIGRATION.md`。
+7. 发布命令、平台矩阵和资产名称必须与 GitHub Actions 工作流保持一致。
