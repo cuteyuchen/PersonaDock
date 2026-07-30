@@ -14,7 +14,7 @@ const emit = defineEmits<{ 'update:modelValue': [value: any] }>()
 
 function update(event: Event): void {
   const value = (event.target as HTMLInputElement).value
-  emit('update:modelValue', props.modelModifiers?.number ? Number(value) : value)
+  emit('update:modelValue', props.type === 'number' || props.modelModifiers?.number ? Number(value) : value)
 }
 </script>
 
