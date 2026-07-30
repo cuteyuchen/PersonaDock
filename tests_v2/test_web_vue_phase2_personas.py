@@ -2,15 +2,18 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from fastapi.testclient import TestClient
+import pytest
+from fastapi import FastAPI, HTTPException
 
+from persona_dock.application import PersonaApplicationService, RevisionStore, canonical_hash
+from persona_dock.core.models import load_canonical_persona
+from persona_dock.registry import RegistryService
+from persona_dock.registry.database import RegistryDatabase
 from persona_dock.web import create_app
-
-
-def _client(tmp_path: Path, monkeypatch) -> TestClient:
-    monkeypatch.setenv("PERSONADOCK_HOME", str(tmp_path / "state"))
-    monkeypatch.setenv("PERSONADOCK_PERSONA_ROOTS", str(tmp_path / "personas"))
-    return TestClient(create_app())
+from persona_dock.web.vue_editor_api import (
+    GuardedCanonicalSaveRequest,
+    register_vue_editor_routes,
+)
 
 
 def test_vue_phase_two_routes_are_registered() -> None:
@@ -21,51 +24,64 @@ def test_vue_phase_two_routes_are_registered() -> None:
     assert "/api/v1/personas/{persona_id}/tests" in paths
 
 
-def test_guarded_canonical_commit_rejects_stale_editor(tmp_path: Path, monkeypatch) -> None:
-    client = _client(tmp_path, monkeypatch)
-    created = client.post(
-        "/api/v1/personas",
-        json={"id": "vue-editor", "name": "Vue Editor", "locale": "zh-CN", "folder": "vue-editor"},
+def test_guarded_canonical_commit_rejects_stale_editor(tmp_path: Path) -> None:
+    registry = RegistryService(RegistryDatabase(tmp_path / "registry.db"))
+    project = tmp_path / "personas" / "vue-editor"
+    PersonaApplicationService(registry).create(
+        project,
+        persona_id="vue-editor",
+        name="Vue Editor",
+        locale="zh-CN",
     )
-    assert created.status_code == 201, created.text
+    revisions = RevisionStore(tmp_path / "revisions")
+    app = FastAPI()
+    register_vue_editor_routes(
+        app,
+        lambda: None,
+        lambda: registry,
+        lambda: revisions,
+    )
+    endpoint = next(
+        route.endpoint
+        for route in app.routes
+        if getattr(route, "path", None) == "/api/v1/personas/{persona_id}/canonical/commit"
+    )
 
-    loaded = client.get("/api/v1/personas/vue-editor/canonical")
-    assert loaded.status_code == 200, loaded.text
-    payload = loaded.json()
-    original_hash = payload["content_hash"]
-    model = payload["model"]
+    model = load_canonical_persona(project)
+    original_hash = canonical_hash(model)
     model["summary"] = "first guarded save"
-
-    saved = client.put(
-        "/api/v1/personas/vue-editor/canonical/commit",
-        json={
-            "model": model,
-            "expected_content_hash": original_hash,
-            "summary": "Vue guarded save",
-            "source": "manual",
-        },
+    saved = endpoint(
+        "vue-editor",
+        GuardedCanonicalSaveRequest(
+            model=model,
+            expected_content_hash=original_hash,
+            summary="Vue guarded save",
+            source="manual",
+        ),
+        None,
     )
-    assert saved.status_code == 200, saved.text
-    saved_value = saved.json()
-    assert saved_value["revision"]["content_hash"] != original_hash
-    assert saved_value["diff"]["changed"] is True
-    assert saved_value["validation"]["ok"] is True
+    assert saved["revision"]["content_hash"] != original_hash
+    assert saved["diff"]["changed"] is True
+    assert saved["validation"]["ok"] is True
 
     stale_model = dict(model)
     stale_model["summary"] = "stale overwrite"
-    stale = client.put(
-        "/api/v1/personas/vue-editor/canonical/commit",
-        json={
-            "model": stale_model,
-            "expected_content_hash": original_hash,
-            "summary": "stale save",
-            "source": "manual",
-        },
-    )
-    assert stale.status_code == 409, stale.text
-    detail = stale.json()["detail"]
+    with pytest.raises(HTTPException) as captured:
+        endpoint(
+            "vue-editor",
+            GuardedCanonicalSaveRequest(
+                model=stale_model,
+                expected_content_hash=original_hash,
+                summary="stale save",
+                source="manual",
+            ),
+            None,
+        )
+    assert captured.value.status_code == 409
+    detail = captured.value.detail
+    assert isinstance(detail, dict)
     assert detail["expected_content_hash"] == original_hash
-    assert detail["current_content_hash"] == saved_value["revision"]["content_hash"]
+    assert detail["current_content_hash"] == saved["revision"]["content_hash"]
 
 
 def test_vue_phase_two_source_contracts() -> None:
