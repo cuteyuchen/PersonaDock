@@ -42,7 +42,8 @@ def test_vue_source_keeps_restrained_desktop_tool_visuals() -> None:
     assert "linear-gradient" not in css
     assert "radial-gradient" not in css
     assert "cdn" not in (FRONTEND / "index.html").read_text(encoding="utf-8").lower()
-    assert "迁移期间返回旧界面" in shell
+    assert "旧界面兼容入口" in shell
+    assert 'href="/legacy"' in shell
     assert "本地人格控制面" in dashboard
     assert "chat-bubble" not in shell
 
