@@ -3,10 +3,10 @@ import { useQuery, useQueryClient } from '@tanstack/vue-query'
 import {
   ArchiveRestore,
   Bot,
-  Boxes,
   Database,
   GitCompareArrows,
   IdCard,
+  KeyRound,
   LayoutDashboard,
   ListTodo,
   Menu,
@@ -65,6 +65,7 @@ const groups = [
     label: '系统',
     items: [
       ['adapters', 'Adapter 与 Skill', Plug],
+      ['settings/providers', 'AI Provider 设置', KeyRound],
       ['jobs', '任务中心', ListTodo],
       ['settings', '系统设置', Settings],
     ],
@@ -113,7 +114,7 @@ onMounted(() => session.applyTheme())
         </Button>
       </div>
 
-      <nav class="flex-1 overflow-y-auto px-2 py-3">
+      <nav class="flex-1 overflow-y-auto px-2 py-3" aria-label="主导航">
         <div v-for="group in groups" :key="group.label" class="mb-4">
           <div class="px-2 pb-1.5 text-[10px] font-semibold uppercase tracking-[0.16em] text-zinc-500">{{ group.label }}</div>
           <RouterLink
@@ -130,9 +131,9 @@ onMounted(() => session.applyTheme())
       </nav>
 
       <div class="border-t border-[var(--sidebar-border)] p-3">
-        <a href="/" class="flex items-center gap-2 rounded-md px-2 py-2 text-xs text-zinc-400 hover:bg-white/6 hover:text-zinc-100">
+        <a href="/legacy" class="flex items-center gap-2 rounded-md px-2 py-2 text-xs text-zinc-400 hover:bg-white/6 hover:text-zinc-100">
           <PanelLeftClose class="size-4" />
-          迁移期间返回旧界面
+          旧界面兼容入口
         </a>
         <div class="px-2 pt-2 text-[10px] leading-4 text-zinc-600">本地优先 · Secret 不返回浏览器</div>
       </div>
@@ -140,7 +141,7 @@ onMounted(() => session.applyTheme())
 
     <div class="min-h-screen lg:pl-[248px]">
       <header class="sticky top-0 z-30 flex h-14 items-center border-b bg-background/95 px-3 backdrop-blur lg:px-5">
-        <Button variant="ghost" size="icon" class="mr-2 lg:hidden" @click="mobileOpen = true">
+        <Button variant="ghost" size="icon" class="mr-2 lg:hidden" aria-label="打开导航" @click="mobileOpen = true">
           <Menu />
         </Button>
         <div class="min-w-0">
