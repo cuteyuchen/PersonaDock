@@ -15,7 +15,12 @@ from persona_dock.registry import RegistryService
 from .capabilities import capability_summary, list_capabilities
 from .jobs import JOB_STATUSES, TERMINAL_JOB_STATUSES, JobStore
 from .parity import parity_report
-from .version import WEB_CONTROL_PLANE_VERSION, WEB_REFACTOR_PHASE
+from .version import (
+    WEB_CONTROL_PLANE_VERSION,
+    WEB_FRONTEND,
+    WEB_FRONTEND_MIGRATION_PHASE,
+    WEB_REFACTOR_PHASE,
+)
 
 _NAVIGATION = (
     {"id": "overview", "label": "概览", "route": "#/overview", "phase": 1},
@@ -94,6 +99,9 @@ def register_v1_routes(
             "api_version": 1,
             "web_control_plane": WEB_CONTROL_PLANE_VERSION,
             "web_refactor_phase": WEB_REFACTOR_PHASE,
+            "frontend": WEB_FRONTEND,
+            "frontend_migration_phase": WEB_FRONTEND_MIGRATION_PHASE,
+            "frontend_preview": "/vue",
             "control_plane": "local-first",
             "canonical_schema": 3,
             "persona_pack_format": 2,
