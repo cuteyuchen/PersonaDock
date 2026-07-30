@@ -157,8 +157,14 @@ def _verify_web(binary: Path, environment: dict[str, str]) -> None:
                     raise AssertionError(health)
                 if health.get("encrypted_private_backup") != "aes-256-gcm-scrypt-v1":
                     raise AssertionError(health)
+                if health.get("web_frontend") != "vue3-shadcn-vue":
+                    raise AssertionError(health)
+                if health.get("web_frontend_migration_phase") != 7:
+                    raise AssertionError(health)
                 for path, marker in (
-                    ("/", "PersonaDock Control Plane"),
+                    ("/", "/assets/vue/app.js"),
+                    ("/vue", "/assets/vue/app.js"),
+                    ("/legacy", "PersonaDock Control Plane"),
                     ("/canonical", "Canonical Persona"),
                     ("/hermes", "Hermes 原生 Profile 管理"),
                     ("/openclaw", "OpenClaw 原生 Agent 管理"),
