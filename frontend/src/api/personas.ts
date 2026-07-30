@@ -42,7 +42,7 @@ export const personasApi = {
   register: (path: string) => api.post<PersonaCreateResult>('/api/v1/personas/register', { path }),
   canonical: (personaId: string) => api.get<CanonicalResponse>(`/api/v1/personas/${encodeURIComponent(personaId)}/canonical`),
   saveCanonical: (personaId: string, model: CanonicalPersona, contentHash: string, summary: string) =>
-    api.put<CanonicalSaveResult>(`/api/v1/personas/${encodeURIComponent(personaId)}/canonical`, {
+    api.put<CanonicalSaveResult>(`/api/v1/personas/${encodeURIComponent(personaId)}/canonical/commit`, {
       model,
       expected_content_hash: contentHash,
       summary,
