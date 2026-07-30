@@ -29,6 +29,19 @@ function requestHeaders(extra?: HeadersInit): Headers {
   return headers
 }
 
+function errorMessage(detail: unknown, response: Response): string {
+  if (typeof detail === 'string' && detail.trim()) return detail
+  if (typeof detail === 'object' && detail !== null && 'detail' in detail) {
+    const value = (detail as { detail: unknown }).detail
+    if (typeof value === 'string') return value
+    if (typeof value === 'object' && value !== null && 'message' in value && typeof (value as { message: unknown }).message === 'string') {
+      return String((value as { message: unknown }).message)
+    }
+    return JSON.stringify(value)
+  }
+  return `${response.status} ${response.statusText}`
+}
+
 async function parseError(response: Response): Promise<ApiError> {
   let detail: unknown = null
   try {
@@ -36,11 +49,7 @@ async function parseError(response: Response): Promise<ApiError> {
   } catch {
     detail = await response.text().catch(() => '')
   }
-  const message =
-    typeof detail === 'object' && detail !== null && 'detail' in detail
-      ? String((detail as { detail: unknown }).detail)
-      : `${response.status} ${response.statusText}`
-  return new ApiError(response.status, message, detail)
+  return new ApiError(response.status, errorMessage(detail, response), detail)
 }
 
 export async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
