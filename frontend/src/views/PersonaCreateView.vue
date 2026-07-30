@@ -38,7 +38,7 @@ const destination = computed(() => {
 })
 
 function syncFolder(): void {
-  if (!folder.value.trim()) setFieldValue('folder', id.value)
+  if (!(folder.value ?? '').trim()) setFieldValue('folder', id.value ?? '')
 }
 
 const mutation = useMutation({
