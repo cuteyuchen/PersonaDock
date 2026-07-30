@@ -63,7 +63,10 @@ async function downloadArtifact(path: string): Promise<void> {
 
 export const operationsApi = {
   personas: () => api.get<ListResponse<PersonaRecord>>('/api/v1/personas'),
-  runtimes: () => api.get<ListResponse<RuntimeInstance>>('/api/v1/runtimes'),
+  runtimes: async (): Promise<ListResponse<RuntimeInstance>> => {
+    const items = await api.get<RuntimeInstance[]>('/api/instances')
+    return { items, count: items.length }
+  },
 
   artifacts: (category: ArtifactCategory) => api.get<ArtifactList>(`/api/v1/artifacts?category=${category}`),
   upload: (filename: string, contentBase64: string) => api.post<ArtifactItem>('/api/v1/uploads', { filename, content_base64: contentBase64 }),
