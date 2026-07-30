@@ -1,4 +1,4 @@
-import { api, request } from '@/api/client'
+import { api } from '@/api/client'
 import type { JobRecord, ListResponse, PersonaRecord, RuntimeInstance } from '@/api/types'
 
 export type JsonObject = Record<string, unknown>
@@ -43,20 +43,11 @@ export interface GenerationRecord extends JsonObject {
   created_at?: string
 }
 
-async function download(path: string): Promise<void> {
-  const response = await request<Response>(`/api/v1/artifacts/download?path=${encodeURIComponent(path)}`, {
-    headers: { Accept: 'application/octet-stream' },
-  })
-  void response
-}
-
 async function downloadArtifact(path: string): Promise<void> {
-  const response = await fetch(`/api/v1/artifacts/download?path=${encodeURIComponent(path)}`, {
-    headers: (() => {
-      const token = sessionStorage.getItem('personadock.web.token') ?? ''
-      return token ? { Authorization: `Bearer ${token}` } : {}
-    })(),
-  })
+  const headers = new Headers()
+  const token = sessionStorage.getItem('personadock.web.token') ?? ''
+  if (token) headers.set('Authorization', `Bearer ${token}`)
+  const response = await fetch(`/api/v1/artifacts/download?path=${encodeURIComponent(path)}`, { headers })
   if (!response.ok) throw new Error(`${response.status} ${response.statusText}`)
   const blob = await response.blob()
   const disposition = response.headers.get('content-disposition') ?? ''
