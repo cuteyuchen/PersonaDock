@@ -35,6 +35,119 @@ export interface PersonaRecord {
   updated_at: string
 }
 
+export interface BindingRecord {
+  id: string
+  persona_id: string
+  runtime_instance_id: string
+  adopted: boolean
+  sync_policy_id: string | null
+  last_deployed_version: string | null
+  managed_since: string
+  last_synced_at: string | null
+}
+
+export interface PersonaDetail extends PersonaRecord {
+  bindings: BindingRecord[]
+}
+
+export interface PersonaRoots {
+  default_root: string
+  roots: string[]
+  environment: string
+}
+
+export interface CanonicalPersona {
+  schema_version: 3
+  id: string
+  version: string
+  name: string
+  locale: string
+  summary: string
+  identity: {
+    statement: string
+    core_traits: string[]
+  }
+  voice: {
+    style: string
+    principles: string[]
+  }
+  boundaries: Array<Record<string, unknown>>
+  behaviors: Array<Record<string, unknown>>
+  budgets: {
+    target_chars: number
+    hard_limit_chars: number
+  }
+  memory: Record<string, unknown>
+  targets: string[]
+  [key: string]: unknown
+}
+
+export interface CanonicalResponse {
+  model: CanonicalPersona
+  content_hash: string
+}
+
+export interface RevisionRecord {
+  revision_id: string
+  persona_id: string
+  parent_revision_id: string | null
+  created_at: string
+  source: string
+  summary: string
+  content_hash: string
+  validation_result: Record<string, unknown>
+  test_result: Record<string, unknown>
+}
+
+export interface RevisionListResponse {
+  current_hash: string
+  items: RevisionRecord[]
+  count: number
+}
+
+export interface DiffRisk {
+  level: 'none' | 'low' | 'medium' | 'high' | 'destructive' | string
+  reasons: string[]
+}
+
+export interface PersonaDiff {
+  changed: boolean
+  before_hash: string
+  after_hash: string
+  risk: DiffRisk
+  field_changes?: Array<Record<string, unknown>>
+  added_boundaries?: Array<Record<string, unknown>>
+  removed_boundaries?: Array<Record<string, unknown>>
+  changed_boundaries?: Array<Record<string, unknown>>
+  added_behaviors?: Array<Record<string, unknown>>
+  removed_behaviors?: Array<Record<string, unknown>>
+  changed_behaviors?: Array<Record<string, unknown>>
+  [key: string]: unknown
+}
+
+export interface ValidationResult {
+  ok: boolean
+  errors: string[]
+}
+
+export interface PersonaTestResult {
+  ok: boolean
+  total?: number
+  passed?: number
+  failed?: number
+  results?: Array<Record<string, unknown>>
+  [key: string]: unknown
+}
+
+export interface CompilePreview {
+  soul: string
+  skill: string
+  soul_chars: number
+  target_chars: number | null
+  hard_limit_chars: number | null
+  targets: string[]
+}
+
 export interface RuntimeInstance {
   id: string
   adapter: string
