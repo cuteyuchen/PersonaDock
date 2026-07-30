@@ -29,7 +29,7 @@ jobs:
             "repos/${GITHUB_REPOSITORY}/statuses/${GITHUB_SHA}" \
             -f state=pending \
             -f context=personadock-bundle \
-            -f description='Building standalone PersonaDock and PersonaPack' \
+            -f description='Building Vue frontend, standalone PersonaDock and PersonaPack' \
             -f target_url="${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}"
 
       - name: Reject legacy project remnants
@@ -79,6 +79,40 @@ jobs:
           name: legacy-audit-${{ github.sha }}
           path: legacy-audit.txt
           if-no-files-found: ignore
+          retention-days: 7
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      - name: Enable pnpm
+        shell: bash
+        run: |
+          corepack enable
+          corepack prepare pnpm@10.14.0 --activate
+          pnpm --version
+
+      - name: Install frontend dependencies
+        run: pnpm --dir frontend install --no-frozen-lockfile
+
+      - name: Type-check Vue frontend
+        run: pnpm --dir frontend typecheck
+
+      - name: Test Vue frontend
+        run: pnpm --dir frontend test
+
+      - name: Build embedded Vue frontend
+        run: pnpm --dir frontend build
+
+      - name: Upload frontend diagnostics
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: frontend-${{ github.sha }}
+          path: |
+            frontend/pnpm-lock.yaml
+            src/persona_dock/web/static/vue/
+          if-no-files-found: warn
           retention-days: 7
 
       - uses: actions/setup-python@v5
@@ -166,7 +200,7 @@ jobs:
             "repos/${GITHUB_REPOSITORY}/statuses/${GITHUB_SHA}" \
             -f state=success \
             -f context=personadock-bundle \
-            -f description='Standalone PersonaDock bundle uploaded successfully' \
+            -f description='Vue frontend and standalone PersonaDock bundle uploaded successfully' \
             -f target_url="${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}"
 
       - name: Mark bundle failed
@@ -179,5 +213,5 @@ jobs:
             "repos/${GITHUB_REPOSITORY}/statuses/${GITHUB_SHA}" \
             -f state=failure \
             -f context=personadock-bundle \
-            -f description='Standalone PersonaDock bundle failed' \
+            -f description='PersonaDock bundle failed' \
             -f target_url="${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}"
