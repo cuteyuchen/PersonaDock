@@ -27,5 +27,7 @@ export default defineConfig({
   test: {
     environment: 'jsdom',
     globals: true,
+    include: ['src/**/*.spec.ts'],
+    exclude: ['e2e/**', 'playwright-report/**', 'test-results/**'],
   },
 })
