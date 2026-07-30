@@ -51,13 +51,15 @@ src/persona_dock/web/static/vue/
 | 阶段 | 状态 | 内容 |
 |---|---|---|
 | Vue Phase 0 | 已完成 | 工程、Vite、TypeScript、Tailwind 4、shadcn-vue、CI 构建链 |
-| Vue Phase 1 | 进行中 | App Shell、Dashboard、Persona 列表、Runtime 列表、Job Center、Settings |
-| Vue Phase 2 | 未开始 | Persona 新建/注册/详情、Canonical Editor、Revision、Diff、Test |
+| Vue Phase 1 | 已完成 | App Shell、Dashboard、Persona 列表、Runtime 列表、Job Center、Settings |
+| Vue Phase 2 | 下一阶段 | Persona 新建/注册/详情、Canonical Editor、Revision、Diff、Test |
 | Vue Phase 3 | 未开始 | Build、Pack、Trust、Backup、Character Card、Adapter、Skill |
 | Vue Phase 4 | 未开始 | Adoption、Deployment Plan/Apply/Rollback、Runtime 详情 |
 | Vue Phase 5 | 未开始 | Memory 与 Session Summary 治理 |
 | Vue Phase 6 | 未开始 | AI Studio 与 Provider Settings |
 | Vue Phase 7 | 未开始 | Playwright、可访问性、性能、切换根入口、删除旧前端 |
+
+Vue Phase 0–1 已通过主分支 bundle `30555536141`：Node/pnpm、TypeScript、Vitest、Vite、完整 pytest、安装脚本、PyInstaller、Vue HTTP 资源验证、PersonaPack 与发布 Artifact 全部成功。
 
 ## 当前入口
 
