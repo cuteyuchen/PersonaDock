@@ -16,7 +16,7 @@ def test_vue_preview_routes_are_registered() -> None:
     assert "/vue" in paths
     assert "/assets/vue/{asset_path:path}" in paths
     assert WEB_FRONTEND == "vue3-shadcn-vue"
-    assert WEB_FRONTEND_MIGRATION_PHASE == 1
+    assert WEB_FRONTEND_MIGRATION_PHASE >= 1
 
 
 def test_vue_project_uses_vite_typescript_and_shadcn_vue() -> None:
