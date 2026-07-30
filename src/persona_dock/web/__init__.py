@@ -33,6 +33,7 @@ from .version import (
     WEB_REFACTOR_PHASE,
 )
 from .vue_assets import register_vue_asset_routes
+from .vue_editor_api import register_vue_editor_routes
 
 
 def create_app(token: str | None = None):
@@ -90,6 +91,7 @@ def create_app(token: str | None = None):
     register_v1_routes(app, require_token, RegistryService)
     register_lifecycle_routes(app, require_token, RegistryService)
     register_editor_routes(app, require_token, RegistryService)
+    register_vue_editor_routes(app, require_token, RegistryService)
     register_artifact_routes(app, require_token, RegistryService)
     register_deployment_routes(app, require_token, RegistryService)
     register_governance_routes(app, require_token, RegistryService)
