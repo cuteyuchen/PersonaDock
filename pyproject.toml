@@ -62,6 +62,7 @@ persona_dock = [
   "web/static/*.html",
   "web/static/*.css",
   "web/static/*.js",
+  "web/static/vue/*",
 ]
 
 [tool.pytest.ini_options]
