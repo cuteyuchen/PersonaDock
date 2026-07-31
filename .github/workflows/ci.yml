@@ -41,10 +41,33 @@ jobs:
         shell: bash
         run: test ! -s retired-skill-files.txt
 
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      - name: Enable pnpm
+        shell: bash
+        run: |
+          corepack enable
+          corepack prepare pnpm@10.14.0 --activate
+
+      - name: Install and validate Vue frontend
+        run: |
+          pnpm --dir frontend install --no-frozen-lockfile
+          pnpm --dir frontend typecheck
+          pnpm --dir frontend test
+          pnpm --dir frontend build
+          test -s src/persona_dock/web/static/vue/index.html
+          test -s src/persona_dock/web/static/vue/app.js
+          test -s src/persona_dock/web/static/vue/app.css
+
       - uses: actions/setup-python@v5
         with:
           python-version: "3.11"
           cache: pip
+
+      - name: Validate release metadata
+        run: python scripts/check_release_version.py
 
       - name: Install
         run: |
@@ -91,7 +114,8 @@ jobs:
       - name: Build and verify standalone executable
         run: |
           pyinstaller --clean --noconfirm --onefile --name personadock --collect-data persona_dock src/persona_dock/__main__.py
-          python scripts/verify_binary.py --binary dist/personadock
+          python scripts/verify_release_binary.py --binary dist/personadock
+          python scripts/verify_vue_binary.py --binary dist/personadock
           python scripts/package_binary.py \
             --binary dist/personadock \
             --output dist/personadock-linux-x86_64.tar.gz
