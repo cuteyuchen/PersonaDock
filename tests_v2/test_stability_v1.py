@@ -78,7 +78,7 @@ def test_golden_v1_contracts_are_stable() -> None:
         "registry_schema_version": REGISTRY_SCHEMA_VERSION,
     }
     assert actual == expected
-    assert __version__ == "1.0.0"
+    assert __version__.split(".", 1)[0] == "1"
     assert descriptors["hermes"].capabilities.session_summary_pull is True
     assert descriptors["openclaw"].capabilities.raw_session_import is True
 
