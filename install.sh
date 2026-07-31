@@ -10,7 +10,7 @@ usage() {
 Install the PersonaDock standalone executable.
 
 Usage:
-  install.sh [--version v1.0.0] [--install-dir PATH]
+  install.sh [--version v1.1.0] [--install-dir PATH]
 
 Environment variables:
   PERSONADOCK_VERSION      Release tag, or "latest" (default)
