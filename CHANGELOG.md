@@ -1,16 +1,21 @@
 # Changelog
 
-## Unreleased — Vue Control Plane migration complete
+## Unreleased
+
+## 1.1.0 — 2026-07-31
+
+PersonaDock 1.1 completes the Vue 3 desktop control plane and exposes the full Persona, Runtime, governance and AI workflow through one local-first interface.
 
 ### Vue 3 desktop control plane
 
 - Replaced the default native JavaScript interface with Vue 3, TypeScript, Vite, shadcn-vue, Reka UI and Tailwind CSS 4.
 - Added a high-density desktop shell, Hash Router, Pinia preferences and TanStack Vue Query server-state management.
 - The Vue control plane now owns `/`; `/vue` remains an alias and the former interface is available at `/legacy` for one compatibility cycle.
-- Node.js is required only for development and release builds; wheel and standalone users continue to receive prebuilt embedded assets.
+- Node.js is required only for development and release builds; wheel and standalone users receive prebuilt embedded assets.
 
-### Persona, Artifact and Runtime workflows
+### Complete Web capability coverage
 
+- Added versioned `/api/v1` resources, Capability Registry, persistent Job Center and SSE events.
 - Migrated Persona creation, registration, details, Canonical/Monaco editing, Revision history, semantic Diff, validation, scenario tests and compile previews.
 - Added optimistic Canonical concurrency protection with `expected_content_hash`; stale editors receive HTTP 409 instead of silently overwriting a newer Revision.
 - Migrated Build, PersonaPack, public export, Ed25519 signing and verification, AES-256-GCM private backups, Character Card, Adapter Doctor and Skill installation.
@@ -20,41 +25,19 @@
 
 - Migrated Memory policy, candidate review, conflict resolution, propagation plans and history.
 - Migrated Reviewed Session Summary policy, manual summaries, review and explicit propagation while keeping raw Session/Transcript synchronization disabled.
-- Migrated encrypted Provider settings, connection tests, model discovery and Create/Distill/Hybrid/Refine AI Persona generation.
-- AI drafts expose Canonical, semantic Diff, risk, validation, tests and compile preview for review, and still require explicit `APPLY`.
-
-### Browser quality gates
-
-- Added Playwright Chromium tests for the root shell and major workspaces.
-- Added axe-core serious/critical accessibility checks and an 8 MiB embedded frontend resource budget.
-- Release bundle now gates on Vue type checking, Vitest, Vite, Playwright, pytest, installer validation, PyInstaller HTTP resource validation, PersonaPack and checksums.
-
-## Unreleased — Web Control Plane 2
-
-### Complete Web capability coverage
-
-- Unified desktop-style Web workspace with versioned `/api/v1` resources, Capability Registry, persistent Job Center and SSE events.
-- Persona creation, registration, Runtime discovery, Adoption, export, Canonical editing, Revision history, semantic Diff, validation, tests and compile previews.
-- Build, PersonaPack, public export, signing, verification, encrypted backup, Character Card, Adapter and Skill workflows.
-- Native Hermes and OpenClaw deployment Plan/Apply/Verify/Rollback with persistent deployment history and runtime-state revalidation.
-- Memory and Reviewed Session Summary policy, collection, review, conflict, plan and apply workspaces.
-
-### AI Persona Studio
-
-- OpenAI, OpenAI-compatible, Anthropic, Gemini and Ollama Provider adapters.
-- AES-256-GCM local Secret Vault; API keys and custom sensitive headers are not stored in SQLite or returned to the browser.
-- Create, Distill, Hybrid and Refine modes.
-- Canonical v3 validation, scenario tests, compile previews and semantic risk Diff before application.
-- AI results remain drafts until the user explicitly applies them to a Revision; no automatic deployment or synchronization.
+- Added OpenAI, OpenAI-compatible, Anthropic, Gemini and Ollama Provider adapters.
+- Added an AES-256-GCM local Secret Vault; API keys and custom sensitive headers are not stored in SQLite or returned to the browser.
+- Added Create, Distill, Hybrid and Refine AI Persona generation modes.
+- AI drafts expose Canonical v3, semantic Diff, risk, validation, tests and compile preview, and still require explicit `APPLY`.
 - Raw instructions and evidence are not stored in Job or Generation history.
 
-### Web security and quality
+### Security and browser quality gates
 
-- Constant-time Bearer Token comparison.
-- Configurable request-body limit, API `no-store`, Content Security Policy, frame denial, MIME sniffing protection and restrictive browser permissions.
-- Automatic CLI/Web top-level command parity validation with zero planned Capability entries.
-- Phase-specific integration tests, standalone executable resource validation and retained pytest diagnostics in GitHub Actions.
-- Restrained desktop utility styling with no gradients, AI chat bubbles or CDN dependencies.
+- Added constant-time Bearer Token comparison, configurable request-body limits, API `no-store`, Content Security Policy, frame denial, MIME sniffing protection and restrictive browser permissions.
+- Added automatic CLI/Web top-level command parity validation with zero planned Capability entries.
+- Added Playwright Chromium tests for the root shell and major workspaces.
+- Added axe-core serious/critical accessibility checks and an 8 MiB embedded frontend resource budget.
+- Release pipelines now gate on Vue type checking, Vitest, Vite, Playwright, pytest, installer validation, PyInstaller HTTP resource validation, PersonaPack and checksums.
 
 ## 1.0.0 — 2026-07-24
 
