@@ -1,4 +1,4 @@
-# PersonaDock 1.0
+# PersonaDock 1.1
 
 **PersonaDock 是一个本地优先的 AI 人格控制平面。**
 
@@ -6,7 +6,8 @@
 
 ## 核心能力
 
-- Canonical Persona Schema v3 与确定性场景测试。
+- Vue 3 + TypeScript 桌面控制面，覆盖 Persona、Artifact、Runtime、治理和 AI 工作流。
+- Canonical Persona Schema v3、Monaco 编辑器、Revision、语义 Diff 与确定性场景测试。
 - Persona Registry、Runtime Discovery、Binding、Snapshot 和 Journal。
 - Hermes 原生 Profile Distribution 部署、验证和回滚。
 - OpenClaw 原生 Agent/Workspace 部署，支持本机、Docker 和 SSH。
@@ -15,6 +16,7 @@
 - PersonaPack Manifest v2、严格完整性验证和分离式 Ed25519 签名。
 - Scrypt + AES-256-GCM 私有 Persona 工程备份。
 - Character Card V1/V2/V3、PNG Metadata 和 CHARX 兼容。
+- OpenAI、OpenAI-compatible、Anthropic、Gemini 与 Ollama AI Studio。
 - Adapter API 1.0 与第三方 Entry Point 插件。
 - Linux x86_64/ARM64、macOS Intel/Apple Silicon、Windows x86_64 独立程序。
 
@@ -38,11 +40,11 @@ irm https://raw.githubusercontent.com/cuteyuchen/PersonaDock/main/install.ps1 | 
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/cuteyuchen/PersonaDock/main/install.sh \
-  | sh -s -- --version v1.0.0
+  | sh -s -- --version v1.1.0
 ```
 
 ```powershell
-$env:PERSONADOCK_VERSION = "v1.0.0"
+$env:PERSONADOCK_VERSION = "v1.1.0"
 irm https://raw.githubusercontent.com/cuteyuchen/PersonaDock/main/install.ps1 | iex
 ```
 
@@ -242,12 +244,19 @@ personadock serve
 ```
 
 ```text
-http://127.0.0.1:8732/
-http://127.0.0.1:8732/canonical
-http://127.0.0.1:8732/hermes
-http://127.0.0.1:8732/openclaw
-http://127.0.0.1:8732/sync
-http://127.0.0.1:8732/sessions
+http://127.0.0.1:8732/           Vue 3 主控制面
+http://127.0.0.1:8732/vue        Vue 兼容别名
+http://127.0.0.1:8732/legacy     旧界面兼容入口
+```
+
+主要 Vue 工作区使用 Hash Router，例如：
+
+```text
+http://127.0.0.1:8732/#/personas
+http://127.0.0.1:8732/#/deployments
+http://127.0.0.1:8732/#/memory
+http://127.0.0.1:8732/#/sessions
+http://127.0.0.1:8732/#/ai-studio
 ```
 
 非 Loopback 绑定必须配置 Bearer Token。
@@ -275,6 +284,7 @@ my-runtime = "my_package.adapter:MyAdapter"
 常用文档：
 
 - [控制平面总览](docs/control-plane.md)
+- [Vue 3 前端迁移](docs/VUE_FRONTEND_MIGRATION.md)
 - [Canonical Persona v3](docs/canonical-persona-v3.md)
 - [Registry 与运行实例发现](docs/registry-discovery.md)
 - [Hermes 原生 Adapter](docs/hermes-native-adapter.md)
@@ -282,20 +292,22 @@ my-runtime = "my_package.adapter:MyAdapter"
 - [受控 Memory 同步](docs/governed-sync.md)
 - [Reviewed Session Summaries](docs/session-summaries.md)
 - [1.0 兼容承诺](docs/compatibility.md)
+- [发布流程](docs/publishing.md)
 - [迁移与回滚](docs/migration-and-rollback.md)
 - [维护审计](docs/maintenance-audit.md)
 
-## 1.0 验收矩阵
+## 发布验收矩阵
 
 每个发布候选必须通过：
 
+- Vue TypeScript、Vitest、Vite、Playwright 与 axe-core。
 - 完整 pytest。
 - Python 3.10–3.13 Contract Matrix。
 - 真实 Docker Hermes/OpenClaw Contract。
 - Linux x86_64 / ARM64。
 - macOS Intel / Apple Silicon。
 - Windows x86_64。
-- 独立程序签名、备份、恢复和 Character Card 工作流。
+- 独立程序签名、备份、恢复、Character Card 和 Vue HTTP 工作流。
 - Release 资产 SHA-256 汇总。
 
 ## License
