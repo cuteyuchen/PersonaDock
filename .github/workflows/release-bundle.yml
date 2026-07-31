@@ -81,6 +81,19 @@ jobs:
           if-no-files-found: ignore
           retention-days: 7
 
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+
+      - name: Resolve release metadata
+        id: version
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          version="$(python scripts/check_release_version.py)"
+          echo "package_version=${version}" >> "$GITHUB_OUTPUT"
+
       - uses: actions/setup-node@v4
         with:
           node-version: "22"
@@ -124,11 +137,6 @@ jobs:
             src/persona_dock/web/static/vue/
           if-no-files-found: error
           retention-days: 7
-
-      - uses: actions/setup-python@v5
-        with:
-          python-version: "3.11"
-          cache: pip
 
       - name: Install build tools
         run: |
@@ -178,7 +186,7 @@ jobs:
       - name: Build standalone executable
         run: |
           pyinstaller --clean --noconfirm --onefile --name personadock --collect-data persona_dock src/persona_dock/__main__.py
-          python scripts/verify_binary.py --binary dist/personadock
+          python scripts/verify_release_binary.py --binary dist/personadock
           python scripts/verify_vue_binary.py --binary dist/personadock
           python scripts/package_binary.py \
             --binary dist/personadock \
@@ -187,8 +195,9 @@ jobs:
       - name: Build example PersonaPack
         run: |
           personadock init /tmp/persona-demo --id persona-demo --name "Persona Demo"
-          personadock pack /tmp/persona-demo --output "$GITHUB_WORKSPACE/dist/persona-demo-0.1.0.personapack"
-          personadock inspect "$GITHUB_WORKSPACE/dist/persona-demo-0.1.0.personapack"
+          output="$GITHUB_WORKSPACE/dist/persona-demo-${{ steps.version.outputs.package_version }}.personapack"
+          personadock pack /tmp/persona-demo --output "$output"
+          personadock inspect "$output"
 
       - name: Generate checksums
         shell: bash
@@ -203,10 +212,11 @@ jobs:
             install.ps1 \
             LICENSE \
             > SHA256SUMS
+          sha256sum --check SHA256SUMS
 
       - uses: actions/upload-artifact@v4
         with:
-          name: persona-dock-0.1.0
+          name: persona-dock-${{ steps.version.outputs.package_version }}
           path: |
             dist/personadock-linux-x86_64.tar.gz
             dist/*.personapack
