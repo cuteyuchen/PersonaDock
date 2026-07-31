@@ -12,9 +12,11 @@ on:
   pull_request:
     paths:
       - ".github/workflows/release.yml"
+      - "frontend/**"
       - "src/**"
       - "scripts/**"
       - "tests_v2/**"
+      - "CHANGELOG.md"
       - "pyproject.toml"
       - "install.sh"
       - "install.ps1"
@@ -25,11 +27,15 @@ on:
         required: true
         type: string
 
+concurrency:
+  group: personadock-release-${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref }}
+  cancel-in-progress: false
+
 jobs:
   validate:
     name: Test and prepare release
     runs-on: ubuntu-22.04
-    timeout-minutes: 20
+    timeout-minutes: 40
     permissions:
       contents: read
     outputs:
@@ -47,21 +53,45 @@ jobs:
           fetch-tags: true
           persist-credentials: false
 
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      - name: Enable pnpm
+        shell: bash
+        run: |
+          corepack enable
+          corepack prepare pnpm@10.14.0 --activate
+
+      - name: Install frontend dependencies
+        run: pnpm --dir frontend install --no-frozen-lockfile
+
+      - name: Validate and build Vue frontend
+        run: |
+          pnpm --dir frontend typecheck
+          pnpm --dir frontend test
+          pnpm --dir frontend build
+          test -s src/persona_dock/web/static/vue/index.html
+          test -s src/persona_dock/web/static/vue/app.js
+          test -s src/persona_dock/web/static/vue/app.css
+
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
           python-version: "3.11"
           cache: pip
 
-      - name: Verify version
+      - name: Verify version metadata
         id: version
         shell: bash
         run: |
           set -Eeuo pipefail
-          package_version="$(python -c 'import pathlib,tomllib; print(tomllib.loads(pathlib.Path("pyproject.toml").read_text(encoding="utf-8"))["project"]["version"])')"
-          if [[ "$GITHUB_EVENT_NAME" != "pull_request" ]]; then
+          if [[ "$GITHUB_EVENT_NAME" == "pull_request" ]]; then
+            package_version="$(python scripts/check_release_version.py)"
+          else
             git ls-remote --exit-code --tags origin "refs/tags/${RELEASE_TAG}"
-            test "${RELEASE_TAG}" = "v${package_version}"
+            package_version="$(python scripts/check_release_version.py --tag "${RELEASE_TAG}")"
           fi
           echo "package_version=${package_version}" >> "$GITHUB_OUTPUT"
 
@@ -70,6 +100,11 @@ jobs:
           python -m pip install --upgrade pip
           python -m pip install -e .[dev]
           pytest
+
+      - name: Run Vue browser E2E
+        run: |
+          pnpm --dir frontend exec playwright install --with-deps chromium
+          pnpm --dir frontend test:e2e
 
       - name: Validate installer scripts
         shell: bash
@@ -82,8 +117,9 @@ jobs:
         run: |
           mkdir -p release-common
           personadock init /tmp/persona-demo --id persona-demo --name "Persona Demo"
-          personadock pack /tmp/persona-demo --output "$GITHUB_WORKSPACE/release-common/persona-demo-${{ steps.version.outputs.package_version }}.personapack"
-          personadock inspect "$GITHUB_WORKSPACE/release-common/persona-demo-${{ steps.version.outputs.package_version }}.personapack"
+          output="$GITHUB_WORKSPACE/release-common/persona-demo-${{ steps.version.outputs.package_version }}.personapack"
+          personadock pack /tmp/persona-demo --output "$output"
+          personadock inspect "$output"
 
       - name: Upload common release assets
         uses: actions/upload-artifact@v4
@@ -93,10 +129,30 @@ jobs:
           if-no-files-found: error
           retention-days: 30
 
+      - name: Upload embedded Vue assets
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-vue-assets
+          path: src/persona_dock/web/static/vue/
+          if-no-files-found: error
+          retention-days: 30
+
+      - name: Upload validation diagnostics
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-validation-diagnostics
+          path: |
+            frontend/playwright-report/
+            frontend/test-results/
+            src/persona_dock/web/static/vue/
+          if-no-files-found: ignore
+          retention-days: 7
+
   build-binary:
     name: Build ${{ matrix.platform }} ${{ matrix.arch }}
     needs: validate
-    timeout-minutes: 35
+    timeout-minutes: 40
     permissions:
       contents: read
     strategy:
@@ -142,6 +198,20 @@ jobs:
           fetch-tags: true
           persist-credentials: false
 
+      - name: Download embedded Vue assets
+        uses: actions/download-artifact@v4
+        with:
+          name: release-vue-assets
+          path: src/persona_dock/web/static/vue
+
+      - name: Verify embedded Vue assets
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          test -s src/persona_dock/web/static/vue/index.html
+          test -s src/persona_dock/web/static/vue/app.js
+          test -s src/persona_dock/web/static/vue/app.css
+
       - name: Show runner information
         shell: bash
         run: |
@@ -159,6 +229,16 @@ jobs:
           python-version: "3.11"
           cache: pip
 
+      - name: Verify release metadata
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          if [[ "$GITHUB_EVENT_NAME" == "pull_request" ]]; then
+            python scripts/check_release_version.py
+          else
+            python scripts/check_release_version.py --tag "${RELEASE_TAG}"
+          fi
+
       - name: Install standalone build tools
         run: |
           python -m pip install --upgrade pip
@@ -166,11 +246,12 @@ jobs:
           python -m pip install pyinstaller
 
       - name: Build standalone executable
-        run: |
-          pyinstaller --clean --noconfirm --onefile --name personadock --collect-data persona_dock src/persona_dock/__main__.py
+        run: pyinstaller --clean --noconfirm --onefile --name personadock --collect-data persona_dock src/persona_dock/__main__.py
 
       - name: Verify standalone executable
-        run: python scripts/verify_binary.py --binary "dist/${{ matrix.executable }}"
+        run: |
+          python scripts/verify_release_binary.py --binary "dist/${{ matrix.executable }}"
+          python scripts/verify_vue_binary.py --binary "dist/${{ matrix.executable }}"
 
       - name: Package standalone executable
         run: python scripts/package_binary.py --binary "dist/${{ matrix.executable }}" --output "release/${{ matrix.archive }}"
@@ -315,18 +396,26 @@ jobs:
           sha256sum "${expected[@]}" > SHA256SUMS
           sha256sum --check SHA256SUMS
 
+      - name: Prepare release notes
+        run: python scripts/extract_release_notes.py --version "${{ needs.validate.outputs.package_version }}" --output release-notes.md
+
       - name: Create or update GitHub Release
         env:
           GH_TOKEN: ${{ github.token }}
         shell: bash
         run: |
           set -Eeuo pipefail
-          if ! gh release view "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+          if gh release view "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            gh release edit "$RELEASE_TAG" \
+              --repo "$GITHUB_REPOSITORY" \
+              --title "PersonaDock ${RELEASE_TAG}" \
+              --notes-file release-notes.md
+          else
             gh release create "$RELEASE_TAG" \
               --repo "$GITHUB_REPOSITORY" \
               --verify-tag \
-              --generate-notes \
-              --title "PersonaDock ${RELEASE_TAG}"
+              --title "PersonaDock ${RELEASE_TAG}" \
+              --notes-file release-notes.md
           fi
           gh release upload "$RELEASE_TAG" \
             --repo "$GITHUB_REPOSITORY" \
