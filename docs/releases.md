@@ -1,5 +1,19 @@
 # Release history
 
+## v1.1.0
+
+PersonaDock 1.1 completes the Vue 3 desktop control plane while preserving the 1.0 data, Adapter and PersonaPack compatibility contracts.
+
+- Vue 3, TypeScript, Vite, shadcn-vue and Monaco replace the default native JavaScript interface.
+- Persona lifecycle, Canonical editing, Revision, semantic Diff, validation, tests and compilation are available in one desktop workspace.
+- Build, PersonaPack, Ed25519 trust, AES-256-GCM backup, Character Card, Adapter and Skill workflows are available in Vue.
+- Runtime adoption, Hermes/OpenClaw deployment Plan/Apply/Rollback and deployment history are available in Vue.
+- Memory and Reviewed Session Summary governance include policy, review, conflict handling, propagation planning and explicit application.
+- AI Studio supports OpenAI, OpenAI-compatible, Anthropic, Gemini and Ollama providers with an encrypted local Secret Vault.
+- Create, Distill, Hybrid and Refine generation remain review-first and require explicit application.
+- Playwright, axe-core, frontend size budgets and embedded Vue HTTP checks are release gates.
+- `/` is the Vue control plane, `/vue` is an alias and `/legacy` retains the previous interface for one compatibility cycle.
+
 ## v1.0.0
 
 PersonaDock 1.0 is the first stable local-first Persona control plane release.
